@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Env vars / secrets
+.env
+*.pem
+
+# Alembic
+backend/alembic/versions/__pycache__/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+# Logs
+*.log

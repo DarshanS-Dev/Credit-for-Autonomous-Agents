@@ -129,6 +129,7 @@ class AgentScoreOut(ORMBase):
 
 class LenderPolicyUpdate(BaseModel):
     max_exposure_per_agent: Decimal
+    total_platform_exposure_cap: Decimal
     min_score_required: Decimal
     allowed_agent_categories: list[str]
 
@@ -137,6 +138,7 @@ class LenderOut(ORMBase):
     id: int
     name: str
     max_exposure_per_agent: Decimal
+    total_platform_exposure_cap: Decimal
     min_score_required: Decimal
     allowed_agent_categories: list[str]
     updated_at: datetime
@@ -149,6 +151,7 @@ class LoanRequest(BaseModel):
     agent_id: int
     lender_id: int
     principal_amount: Decimal
+    task_category: Optional[str] = None
 
 
 class LoanDecisionRationale(BaseModel):

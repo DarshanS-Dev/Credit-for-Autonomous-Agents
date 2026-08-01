@@ -100,6 +100,7 @@ class Loan(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id"), nullable=False)
+    lender_id: Mapped[int] = mapped_column(ForeignKey("lenders.id"), nullable=False)
     principal_amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     outstanding_balance: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     status: Mapped[LoanStatus] = mapped_column(
@@ -110,6 +111,7 @@ class Loan(Base):
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     agent: Mapped["Agent"] = relationship(back_populates="loans")
+    lender: Mapped["Lender"] = relationship(back_populates="loans")
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="loan")
 
 
@@ -148,12 +150,15 @@ class Lender(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     max_exposure_per_agent: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    total_platform_exposure_cap: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     min_score_required: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
     allowed_agent_categories: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+    loans: Mapped[list["Loan"]] = relationship(back_populates="lender")
 
 
 class Event(Base):

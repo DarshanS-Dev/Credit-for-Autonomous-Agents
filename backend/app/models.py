@@ -39,6 +39,8 @@ class TransactionType(str, enum.Enum):
     TASK_PAYOUT = "task_payout"
     SPEND = "spend"
     CROSS_AGENT_CLAWBACK = "cross_agent_clawback"
+    INSURANCE_CONTRIBUTION = "insurance_contribution"
+    INSURANCE_PAYOUT = "insurance_payout"
 
 
 class EventType(str, enum.Enum):
@@ -110,14 +112,14 @@ class Loan(Base):
     outstanding_balance: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     write_off_amount: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
     approved_recipient: Mapped[str] = mapped_column(String(255), nullable=False)
+    score_at_decision: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
+    policy_min_score_at_decision: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
     status: Mapped[LoanStatus] = mapped_column(
         Enum(LoanStatus), default=LoanStatus.PENDING, nullable=False
     )
     credit_limit_at_issuance: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    score_at_decision: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
-    policy_min_score_at_decision: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
 
     agent: Mapped["Agent"] = relationship(back_populates="loans")
     lender: Mapped["Lender"] = relationship(back_populates="loans")
@@ -183,3 +185,20 @@ class Event(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     agent: Mapped["Agent"] = relationship(back_populates="events")
+
+
+class InsurancePool(Base):
+    """
+    Single-row table (id=1, seeded once via migration). Funded by a small
+    skim off every successful repayment deduction (ledger_service.py); on
+    default, drawn down (capped per-default) before the loss is written off,
+    so a lender's exposure is protected two layers deep: cross-agent
+    clawback first, then the insurance pool, then finally a bounded write-off.
+    """
+    __tablename__ = "insurance_pool"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    balance: Mapped[float] = mapped_column(Numeric(18, 2), default=0, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

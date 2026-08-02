@@ -59,7 +59,8 @@ def record_inflow(
     would be triggered by the task-execution side, not a human -- here
     it's called directly (by the demo persona scripts or manually) to
     represent that event. Repayment deduction happens before anything
-    reaches the agent's spendable balance, per Section 7.
+    reaches the agent's spendable balance, per Section 7. A slice of any
+    deduction also flows into the insurance pool (see ledger_service.py).
     """
     result = ledger_service.process_inflow(db, agent.id, payload.amount)
     db.commit()
@@ -68,6 +69,7 @@ def record_inflow(
         inflow_amount=result.inflow_amount,
         amount_deducted=result.amount_deducted,
         amount_released_to_agent=result.amount_released_to_agent,
+        insurance_contribution=result.insurance_contribution,
         write_off_amount=None,  # only ever set on a declared default, not a normal inflow
         created_at=result.created_at,
     )
@@ -130,6 +132,7 @@ def declare_task_failure(
         agent_id=default_result.agent_id,
         shortfall_before_clawback=default_result.shortfall_before_clawback,
         total_clawed_back=default_result.total_clawed_back,
+        insurance_payout=default_result.insurance_payout,
         final_write_off_amount=default_result.final_write_off_amount,
         agent_status="defaulted",
     )

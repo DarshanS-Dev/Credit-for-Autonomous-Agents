@@ -43,7 +43,7 @@ Cross-agent clawback (built now, per discussion):
   the paying sibling and the original defaulting agent/loan, so the ledger
   stays fully auditable per-agent even though money moved between agents.
 """
-
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -70,6 +70,7 @@ class InflowResult:
     amount_released_to_agent: Decimal
     loan_fully_repaid: bool
     remaining_outstanding_balance: Decimal
+    created_at: datetime
 
 
 @dataclass
@@ -160,6 +161,7 @@ def process_inflow(db: Session, agent_id: int, inflow_amount: Decimal) -> Inflow
     Event row) atomically.
     """
     inflow_amount = Decimal(inflow_amount)
+    recorded_at = datetime.now(timezone.utc)
     loan = _get_open_loan(db, agent_id)
 
     if loan is None:
@@ -176,6 +178,7 @@ def process_inflow(db: Session, agent_id: int, inflow_amount: Decimal) -> Inflow
             amount_released_to_agent=inflow_amount,
             loan_fully_repaid=False,
             remaining_outstanding_balance=Decimal("0"),
+            created_at=recorded_at,
         )
 
     outstanding = Decimal(loan.outstanding_balance)
@@ -192,7 +195,7 @@ def process_inflow(db: Session, agent_id: int, inflow_amount: Decimal) -> Inflow
             event_type=EventType.REPAYMENT_DEDUCTED,
             detail=f"loan fully repaid: final deduction {amount_deducted} clears outstanding balance",
         ))
-        
+
     db.add(Transaction(
         agent_id=agent_id,
         loan_id=loan.id,
@@ -214,6 +217,7 @@ def process_inflow(db: Session, agent_id: int, inflow_amount: Decimal) -> Inflow
         amount_released_to_agent=remainder,
         loan_fully_repaid=loan_fully_repaid,
         remaining_outstanding_balance=Decimal(loan.outstanding_balance),
+        created_at=recorded_at,
     )
 
 

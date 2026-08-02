@@ -255,6 +255,25 @@ class AnomalyFlag(BaseModel):
     deviation_multiple: Decimal  # e.g. 5.2 -> "5.2x baseline"
     flagged_at: datetime
 
+# ---------- Repayment router responses ----------
+
+class SpendCheckResultOut(BaseModel):
+    """Response for POST /repayment/spend/{agent_id}. Purely informational
+    -- no money moves on this call, see repayment.py docstring."""
+    severity: str  # "none" | "flagged" | "defaulted"
+    reason: Optional[str] = None
+    loan_id: Optional[int] = None
+
+
+class TaskFailureResultOut(BaseModel):
+    """Response for POST /repayment/task-failure/{agent_id}."""
+    loan_id: int
+    agent_id: int
+    shortfall_before_clawback: Decimal
+    total_clawed_back: Decimal
+    final_write_off_amount: Decimal
+    agent_status: str
+
 
 # ---------- Operator Console ----------
 

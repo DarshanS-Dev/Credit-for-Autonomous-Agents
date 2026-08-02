@@ -102,6 +102,7 @@ class DelegationMandateSign(BaseModel):
     """Payload the principal signs to create the agent<->principal link."""
     agent_id: int
     bounds: str  # human-readable terms of authorization shown at Onboarding step
+    issued_at: datetime
     signature: str  # Ed25519 signature over the canonical mandate payload
 
 

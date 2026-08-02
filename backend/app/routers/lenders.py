@@ -15,11 +15,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Agent, AgentScore, Loan, LoanStatus, AgentStatus
-from app.schemas import LenderPolicyUpdate, LenderOut, ExposureStats, AgentRosterItem
+from app.models import Agent, Loan, LoanStatus, AgentStatus, InsurancePool
+from app.schemas import LenderPolicyUpdate, LenderOut, ExposureStats, AgentRosterItem, InsurancePoolOut
 from app.dependencies import get_current_lender
 from app.services import policy_engine
-
 from app.services.underwriting_service import COLD_START_LIMIT
 
 router = APIRouter(prefix="/lenders", tags=["lenders"])
@@ -58,11 +57,10 @@ def get_exposure_stats(
 ):
     """
     Lender Dashboard + Operator Console exposure summary. active_count /
-    defaulted_count are global agent-status counts (not scoped to this
-    lender specifically, since Agent doesn't carry a lender_id -- an
-    agent can borrow from multiple lenders over its lifetime) --
-    starter_limit_count and total_capital_out ARE lender-scoped, since
-    those come from this lender's own Loan rows.
+    defaulted_count are global agent-status counts (Agent doesn't carry a
+    lender_id -- an agent can borrow from multiple lenders over its
+    lifetime) -- starter_limit_count and total_capital_out ARE
+    lender-scoped, since those come from this lender's own Loan rows.
     """
     total_capital_out = policy_engine.current_platform_exposure(db, lender.id)
 
@@ -71,7 +69,7 @@ def get_exposure_stats(
         .filter(
             Loan.lender_id == lender.id,
             Loan.status == LoanStatus.APPROVED,
-            Loan.credit_limit_at_issuance == COLD_START_LIMIT,  # COLD_START_LIMIT
+            Loan.credit_limit_at_issuance == COLD_START_LIMIT,
         )
         .count()
     )
@@ -96,8 +94,7 @@ def agent_directory(
     not just this lender's own borrowers (a lender browses agents to
     decide whether to lend, so this must include agents with no loan
     from this lender yet). Reuses AgentRosterItem -- same shape the
-    Principal Dashboard roster uses, since directory rows need the same
-    id/name/status/outstanding_balance fields.
+    Principal Dashboard roster uses.
     """
     agents = db.query(Agent).all()
     rows = []
@@ -114,3 +111,15 @@ def agent_directory(
             outstanding_balance=open_loan.outstanding_balance if open_loan else 0,
         ))
     return rows
+
+
+@router.get("/insurance-pool", response_model=InsurancePoolOut)
+def get_insurance_pool(db: Session = Depends(get_db)):
+    """
+    Live pool balance for the Lender Dashboard 'growing pool' visual and
+    the Operator Console default-absorption demo moment. Not gated by
+    get_current_lender -- pool balance isn't sensitive per-lender data,
+    any authenticated party watching the dashboard should see it.
+    """
+    pool = db.query(InsurancePool).filter(InsurancePool.id == 1).first()
+    return pool

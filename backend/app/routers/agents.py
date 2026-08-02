@@ -92,27 +92,15 @@ def sign_mandate(
     principal=Depends(get_current_principal),
     db: Session = Depends(get_db),
 ):
-    """
-    Step 2 of Onboarding: principal has signed the canonical mandate
-    payload client-side (their private key never reaches us). We verify
-    it once here before persisting, and store the raw components as the
-    JSON blob dependencies.py expects to re-verify on every future
-    loan/repayment request.
-
-    Rejects (422) if the signature doesn't verify against the principal's
-    stored public_key -- this is the only place a bad mandate can be
-    caught before it's trusted for the agent's whole lifetime.
-    """
     agent = _get_owned_agent_or_404(db, agent_id, principal.id)
 
-    issued_at = datetime.now(timezone.utc)
     valid = verify_mandate(
         public_key_b64=principal.public_key,
         signature_b64=payload.signature,
         principal_id=principal.id,
         agent_id=agent.id,
         bounds=payload.bounds,
-        issued_at=issued_at,
+        issued_at=payload.issued_at,   # <-- use the client's issued_at, not a new one
     )
     if not valid:
         raise HTTPException(
@@ -122,7 +110,7 @@ def sign_mandate(
 
     agent.delegation_mandate = json.dumps({
         "bounds": payload.bounds,
-        "issued_at": issued_at.isoformat(),
+        "issued_at": payload.issued_at.isoformat(),   # <-- store client's issued_at
         "signature": payload.signature,
     })
     db.commit()

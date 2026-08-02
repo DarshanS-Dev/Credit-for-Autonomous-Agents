@@ -28,6 +28,9 @@ class TransactionType(str, Enum):
     repayment = "repayment"
     task_payout = "task_payout"
     spend = "spend"
+    cross_agent_clawback = "cross_agent_clawback"
+    insurance_contribution = "insurance_contribution"
+    insurance_payout = "insurance_payout"
 
 
 class EventType(str, Enum):
@@ -99,6 +102,7 @@ class DelegationMandateSign(BaseModel):
     """Payload the principal signs to create the agent<->principal link."""
     agent_id: int
     bounds: str  # human-readable terms of authorization shown at Onboarding step
+    issued_at: datetime
     signature: str  # Ed25519 signature over the canonical mandate payload
 
 
@@ -229,6 +233,7 @@ class RepaymentLedgerEntry(BaseModel):
     inflow_amount: Decimal
     amount_deducted: Decimal
     amount_released_to_agent: Decimal
+    insurance_contribution: Decimal = Decimal("0")
     write_off_amount: Optional[Decimal] = Field(
         default=None,
         description="Set only when payout was spent/unavailable before deduction (bounded loss case)"
@@ -255,6 +260,7 @@ class AnomalyFlag(BaseModel):
     deviation_multiple: Decimal  # e.g. 5.2 -> "5.2x baseline"
     flagged_at: datetime
 
+
 # ---------- Repayment router responses ----------
 
 class SpendCheckResultOut(BaseModel):
@@ -271,8 +277,18 @@ class TaskFailureResultOut(BaseModel):
     agent_id: int
     shortfall_before_clawback: Decimal
     total_clawed_back: Decimal
+    insurance_payout: Decimal
     final_write_off_amount: Decimal
     agent_status: str
+
+
+# ---------- Insurance Pool ----------
+
+class InsurancePoolOut(BaseModel):
+    """Live pool balance for the Lender Dashboard 'growing pool' visual
+    and the Operator Console default-absorption demo moment."""
+    balance: Decimal
+    updated_at: datetime
 
 
 # ---------- Operator Console ----------

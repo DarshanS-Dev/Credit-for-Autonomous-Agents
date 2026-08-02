@@ -177,6 +177,7 @@ class LoanRequest(BaseModel):
     agent_id: int
     lender_id: int
     principal_amount: Decimal
+    approved_recipient: str
     task_category: Optional[str] = None
 
 
@@ -241,6 +242,7 @@ class RepaymentLedgerEntry(BaseModel):
 class EventOut(ORMBase):
     id: int
     agent_id: int
+    loan_id: Optional[int] = None
     event_type: EventType
     detail: str
     created_at: datetime

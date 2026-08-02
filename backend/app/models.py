@@ -109,6 +109,7 @@ class Loan(Base):
     interest_amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False, default=0)
     outstanding_balance: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     write_off_amount: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
+    approved_recipient: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[LoanStatus] = mapped_column(
         Enum(LoanStatus), default=LoanStatus.PENDING, nullable=False
     )
@@ -174,6 +175,7 @@ class Event(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id"), nullable=False)
+    loan_id: Mapped[int | None] = mapped_column(ForeignKey("loans.id"), nullable=True)
     event_type: Mapped[EventType] = mapped_column(Enum(EventType), nullable=False)
     detail: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

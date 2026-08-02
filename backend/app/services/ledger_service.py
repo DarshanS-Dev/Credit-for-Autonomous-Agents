@@ -49,7 +49,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.models import Agent, Loan, LoanStatus, Transaction, TransactionType, Wallet
+from app.models import Agent, Event, EventType, Loan, LoanStatus, Transaction, TransactionType, Wallet
 
 
 # ---------- Tunable constants ----------
@@ -123,6 +123,27 @@ def _get_open_loan(db: Session, agent_id: int) -> Loan | None:
 
 
 # ---------- Main entrypoint: normal inflow ----------
+def disburse_loan(db: Session, loan: Loan) -> None:
+    """
+    Credits a newly-approved loan's principal to the agent's spendable
+    balance and records the DISBURSEMENT transaction. Called once, by the
+    loans.py router, immediately after a Loan transitions PENDING -> APPROVED.
+
+    Goes through _credit_wallet like everything else here -- this file
+    remains the only place Wallet.spendable_balance is touched, disbursement
+    included, not just repayment.
+
+    Does not commit -- caller (router) owns the transaction boundary, same
+    convention as process_inflow() / declare_default().
+    """
+    amount = Decimal(loan.principal_amount)
+    _credit_wallet(db, loan.agent_id, amount)
+    db.add(Transaction(
+        agent_id=loan.agent_id,
+        loan_id=loan.id,
+        type=TransactionType.DISBURSEMENT,
+        amount=amount,
+    ))
 
 def process_inflow(db: Session, agent_id: int, inflow_amount: Decimal) -> InflowResult:
     """
@@ -165,7 +186,13 @@ def process_inflow(db: Session, agent_id: int, inflow_amount: Decimal) -> Inflow
     loan_fully_repaid = loan.outstanding_balance == 0
     if loan_fully_repaid:
         loan.status = LoanStatus.REPAID
-
+        db.add(Event(
+            agent_id=agent_id,
+            loan_id=loan.id,
+            event_type=EventType.REPAYMENT_DEDUCTED,
+            detail=f"loan fully repaid: final deduction {amount_deducted} clears outstanding balance",
+        ))
+        
     db.add(Transaction(
         agent_id=agent_id,
         loan_id=loan.id,

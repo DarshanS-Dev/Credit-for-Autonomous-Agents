@@ -5,6 +5,7 @@ import type {
   AgentDetailOut,
   WalletOut,
   AgentScoreOut,
+  TransactionOut,
 } from "./types";
 
 export function createAgent(name: string, description?: string): Promise<AgentOut> {
@@ -18,11 +19,13 @@ export function createAgent(name: string, description?: string): Promise<AgentOu
 export function signAgentMandate(
   agentId: number,
   bounds: string,
-  signature: string
+  signature: string,
+  issuedAt: string
 ): Promise<AgentOut> {
   return api.post<AgentOut>(`/agents/${agentId}/mandate`, {
     agent_id: agentId,
     bounds,
+    issued_at: issuedAt,
     signature,
   });
 }
@@ -46,3 +49,24 @@ export function getAgentLenderView(agentId: number): Promise<AgentDetailOut> {
 export function getAgentScore(agentId: number): Promise<AgentScoreOut> {
   return api.get<AgentScoreOut>(`/agents/${agentId}/score`);
 }
+
+export function revokeAgentAsPrincipal(
+  agentId: number,
+  reason = "principal-initiated revocation"
+): Promise<AgentOut> {
+  return api.post<AgentOut>(`/agents/${agentId}/revoke`, { reason });
+}
+
+export function setCreditLimit(
+  agentId: number,
+  creditLimit: number | null
+): Promise<AgentOut> {
+  return api.put<AgentOut>(`/agents/${agentId}/credit-limit`, {
+    credit_limit: creditLimit,
+  });
+}
+
+export function getAgentTransactions(agentId: number): Promise<TransactionOut[]> {
+  return api.get<TransactionOut[]>(`/agents/${agentId}/transactions`);
+}
+

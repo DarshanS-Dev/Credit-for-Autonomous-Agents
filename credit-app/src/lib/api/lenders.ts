@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { LenderOut, ExposureStats, AgentRosterItem } from "./types";
+import type { LenderOut, ExposureStats, AgentRosterItem, InsurancePoolOut } from "./types";
 
 export interface LenderPolicyPayload {
   max_exposure_per_agent: number;
@@ -23,3 +23,8 @@ export function getExposureStats(token?: string): Promise<ExposureStats> {
 export function listLenderAgents(token?: string): Promise<AgentRosterItem[]> {
   return api.get<AgentRosterItem[]>("/lenders/agents", { token });
 }
+
+export function getInsurancePool(): Promise<InsurancePoolOut> {
+  return api.get<InsurancePoolOut>("/lenders/insurance-pool");
+}
+

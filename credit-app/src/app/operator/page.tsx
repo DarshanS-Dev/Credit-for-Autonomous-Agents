@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getOperatorEvents, triggerPersonaFlow, bootstrapDemoTokens, DemoTokens, revokeAgent } from "@/lib/api/operator";
-import { listLenderAgents, getExposureStats } from "@/lib/api/lenders";
+import { getOperatorEvents, triggerPersonaFlow, bootstrapDemoTokens, DemoTokens, revokeAgent, triggerPersona } from "@/lib/api/operator";
+import { listLenderAgents, getExposureStats, getInsurancePool } from "@/lib/api/lenders";
+import type { PersonaTriggerResult } from "@/lib/api/types";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -19,6 +20,7 @@ export default function OperatorConsole() {
 
   const [loadingPersona, setLoadingPersona] = useState<string | null>(null);
   const [successPersona, setSuccessPersona] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState<PersonaTriggerResult | null>(null);
 
   useEffect(() => {
     bootstrapDemoTokens().then(setTokens);
@@ -45,14 +47,23 @@ export default function OperatorConsole() {
     refetchInterval: 5000,
   });
 
+  const { data: insurancePool } = useQuery({
+    queryKey: ['insurance-pool-console'],
+    queryFn: () => getInsurancePool(),
+    refetchInterval: 5000,
+  });
+
   const handleTrigger = async (type: "established" | "new" | "misbehaving" | "llm") => {
-    if (!tokens || type === "llm") return;
+    if (type === "llm") return;
     setLoadingPersona(type);
     try {
-      await triggerPersonaFlow(type, tokens);
+      const result = await triggerPersona(type);
+      setLastResult(result);
       setSuccessPersona(type);
       queryClient.invalidateQueries({ queryKey: ['operator-events-console'] });
-      setTimeout(() => setSuccessPersona(null), 2000);
+      queryClient.invalidateQueries({ queryKey: ['lender-agents-console'] });
+      queryClient.invalidateQueries({ queryKey: ['insurance-pool-console'] });
+      setTimeout(() => setSuccessPersona(null), 3000);
     } finally {
       setLoadingPersona(null);
     }
@@ -175,8 +186,8 @@ export default function OperatorConsole() {
                   >
                     <option value="" className="bg-surface text-text-primary">-- Select active agent --</option>
                     {selectableAgents.map((a) => (
-                      <option key={a.agent_id} value={a.agent_id} className="bg-surface text-text-primary">
-                        {a.agent_name} ({a.status})
+                      <option key={a.id} value={a.id} className="bg-surface text-text-primary">
+                        {a.name} ({a.status})
                       </option>
                     ))}
                   </select>
@@ -202,13 +213,13 @@ export default function OperatorConsole() {
               <div className="p-4 border-2 border-text-primary bg-transparent text-text-primary font-mono">
                 <span className="block text-[9px] text-text-primary/70 uppercase">Active Agents</span>
                 <span className="text-xl font-bold flex items-center gap-1">
-                  {stats?.active_agents || 0} <Doodle type="motion" size={14} />
+                  {stats?.active_count || 0} <Doodle type="motion" size={14} />
                 </span>
               </div>
               <div className="p-4 border-2 border-text-primary bg-transparent text-text-primary font-mono">
                 <span className="block text-[9px] text-text-primary/70 uppercase">Total Defaulted</span>
                 <span className="text-xl font-bold text-danger">
-                  {stats?.defaulted_agents || 0}
+                  {stats?.defaulted_count || 0}
                 </span>
               </div>
               <div className="p-4 border-2 border-text-primary bg-transparent text-text-primary font-mono">
@@ -235,16 +246,40 @@ export default function OperatorConsole() {
                   >
                     <div className="flex items-center gap-3">
                       <span className={`h-2 w-2 rounded-none ${
-                        item.event_type === "loan_issued" ? "bg-text-primary" : 
+                        item.event_type === "loan_approved" ? "bg-text-primary" : 
                         item.event_type.includes("defaulted") || item.event_type.includes("revoked") ? "bg-danger" : "bg-text-secondary"
                       }`} />
-                      <span className="text-text-primary border border-text-primary px-1">{item.event_type} - {item.details}</span>
+                      <span className="text-text-primary border border-text-primary px-1">{item.event_type} - {item.detail}</span>
                     </div>
                     <span className="text-[10px] text-text-secondary/60">{new Date(item.created_at).toLocaleString()}</span>
                   </motion.div>
                 ))}
               </div>
             </Card>
+
+            {/* Insurance Pool */}
+            <div className="p-4 border-2 border-accent bg-accent/5 text-text-primary font-mono">
+              <span className="block text-[9px] text-text-primary/70 uppercase">Insurance Pool Balance</span>
+              <span className="text-xl font-bold flex items-center gap-1">
+                ${insurancePool ? Number(insurancePool.balance).toLocaleString() : '0'} <Doodle type="sparkle" size={14} />
+              </span>
+            </div>
+
+            {/* Last Persona Result */}
+            {lastResult && (
+              <Card role="none" className="space-y-3 border border-accent/30">
+                <h3 className="font-mono text-xs uppercase tracking-widest text-accent font-bold border-b border-accent/10 pb-2">
+                  Last Trigger Result
+                </h3>
+                <div className="font-mono text-xs text-text-secondary space-y-2">
+                  <div className="flex justify-between"><span className="uppercase">Persona</span><span className="font-bold text-text-primary">{lastResult.persona}</span></div>
+                  <div className="flex justify-between"><span className="uppercase">Agent #{lastResult.agent_id}</span><span className="font-bold text-text-primary">{lastResult.agent_status}</span></div>
+                  {lastResult.loan_id && <div className="flex justify-between"><span className="uppercase">Loan #{lastResult.loan_id}</span><span className="font-bold text-text-primary">{lastResult.loan_status}</span></div>}
+                  {lastResult.is_cold_start && <span className="inline-block bg-accent/10 border border-accent/30 px-2 py-0.5 text-[10px] uppercase font-bold">Cold-start</span>}
+                  <p className="text-[11px] text-text-secondary border-t border-text-secondary/10 pt-2 mt-1">{lastResult.explanation}</p>
+                </div>
+              </Card>
+            )}
 
           </div>
 

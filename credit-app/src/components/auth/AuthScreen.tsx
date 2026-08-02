@@ -44,6 +44,7 @@ export default function AuthScreen() {
   }, [role, router]);
 
   useEffect(() => {
+    if (!cardRef.current) return;
     const ctx = gsap.context(() => {
       gsap.fromTo(
         cardRef.current,

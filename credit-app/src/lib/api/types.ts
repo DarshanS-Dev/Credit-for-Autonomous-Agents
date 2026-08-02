@@ -122,8 +122,54 @@ export interface TaskFailureResultOut {
   agent_id: number;
   shortfall_before_clawback: string | number;
   total_clawed_back: string | number;
+  insurance_payout: string | number;
   final_write_off_amount: string | number;
   agent_status: string;
+}
+
+export type TransactionType =
+  | "disbursement"
+  | "repayment"
+  | "task_payout"
+  | "spend"
+  | "cross_agent_clawback"
+  | "insurance_contribution"
+  | "insurance_payout";
+
+export interface TransactionOut {
+  id: number;
+  agent_id: number;
+  loan_id: number | null;
+  type: TransactionType;
+  amount: string | number;
+  created_at: string;
+}
+
+export interface RepaymentLedgerEntry {
+  inflow_amount: string | number;
+  amount_deducted: string | number;
+  amount_released_to_agent: string | number;
+  insurance_contribution: string | number;
+  write_off_amount: string | number | null;
+  created_at: string;
+}
+
+export interface InsurancePoolOut {
+  balance: string | number;
+  updated_at: string;
+}
+
+export interface PersonaTriggerResult {
+  persona: string;
+  agent_id: number;
+  agent_status: string;
+  loan_id: number | null;
+  loan_status: string | null;
+  credit_limit_at_issuance: string | number | null;
+  is_cold_start: boolean | null;
+  insurance_payout: string | number | null;
+  final_write_off_amount: string | number | null;
+  explanation: string;
 }
 
 export function toNumber(value: string | number | undefined | null): number {

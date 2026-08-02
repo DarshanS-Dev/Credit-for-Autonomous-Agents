@@ -75,7 +75,6 @@ export default function AgentDirectory() {
                 <thead>
                   <tr className="border-b border-text-secondary/15 text-text-secondary bg-text-secondary/5 uppercase">
                     <th className="p-4">AGENT</th>
-                    <th className="p-4">SCORE</th>
                     <th className="p-4">STATUS</th>
                     <th className="p-4">OUTSTANDING BALANCE</th>
                     <th className="p-4">ACTION</th>
@@ -84,7 +83,7 @@ export default function AgentDirectory() {
                 <tbody>
                   {filteredAgents.map((agent, index) => (
                     <motion.tr
-                      key={agent.agent_id}
+                      key={agent.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.03, duration: 0.4 }}
@@ -92,20 +91,17 @@ export default function AgentDirectory() {
                     >
                       <td className="p-4 font-bold text-text-primary">
                         <div>
-                          <span>{agent.agent_name}</span>
+                          <span>{agent.name}</span>
                         </div>
                       </td>
-                      <td className="p-4 font-bold text-base text-text-primary">
-                        {agent.score} / 100
-                      </td>
                       <td className="p-4">
-                        <StatusDot status={agent.status.toLowerCase()} pulse={agent.status === "DEFAULTED"} />
+                        <StatusDot status={agent.status.toLowerCase()} pulse={agent.status === "defaulted"} />
                       </td>
                       <td className="p-4 font-bold text-text-primary">
-                        ${agent.outstanding_balance.toLocaleString()}
+                        ${Number(agent.outstanding_balance).toLocaleString()}
                       </td>
                       <td className="p-4">
-                        <Link href={`/lender/agents/${agent.agent_id}`}>
+                        <Link href={`/lender/agents/${agent.id}`}>
                           <button className="px-3 py-1.5 border border-text-secondary/20 hover:border-accent hover:text-accent uppercase text-[10px] font-bold transition-all">
                             Details
                           </button>

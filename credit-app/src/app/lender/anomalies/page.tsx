@@ -25,7 +25,7 @@ export default function AnomalyFeed() {
     id: e.id,
     agentName: "Agent", // We don't have agent name in EventOut, could fetch from listLenderAgents but skipping for now to match plan.
     severity: "high", // Mock severity as backend doesn't provide it
-    description: e.details,
+    description: e.detail,
     date: new Date(e.created_at).toLocaleString()
   }));
 

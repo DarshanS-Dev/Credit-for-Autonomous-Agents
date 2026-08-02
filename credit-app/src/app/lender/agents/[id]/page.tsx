@@ -5,10 +5,12 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "@/context/SessionContext";
-import { getAgentLenderView, getAgentScore, getAgentWallet } from "@/lib/api/agents";
+import { getAgentLenderView, getAgentScore, getAgentWallet, setCreditLimit, getAgentTransactions } from "@/lib/api/agents";
 import { listLoans } from "@/lib/api/loans";
-import { revokeAgent } from "@/lib/api/operator";
-import { updateLenderPolicy } from "@/lib/api/lenders";
+import { revokeAgent } from "@/lib/api/operator-actions";
+import { recordInflow, declareTaskFailure } from "@/lib/api/repayment";
+import { formatCurrency, formatDateTime, toNumber } from "@/lib/api/types";
+import type { TransactionOut } from "@/lib/api/types";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -54,6 +56,12 @@ export default function LenderAgentDetail() {
     enabled: !!agentId,
   });
 
+  const { data: transactions = [] } = useQuery({
+    queryKey: ['agent-transactions', agentId],
+    queryFn: () => getAgentTransactions(agentId),
+    enabled: !!agentId,
+  });
+
   const revokeMutation = useMutation({
     mutationFn: () => revokeAgent(agentId, session?.token),
     onSuccess: () => {
@@ -62,15 +70,32 @@ export default function LenderAgentDetail() {
     }
   });
 
-  const updatePolicyMutation = useMutation({
-    mutationFn: () => updateLenderPolicy({
-      max_exposure_per_agent: newLimit,
-      total_platform_exposure_cap: 100000,
-      min_score_required: 60,
-      allowed_agent_categories: ["all"]
-    }),
+  const creditLimitMutation = useMutation({
+    mutationFn: () => setCreditLimit(agentId, newLimit || null),
     onSuccess: () => {
-      alert(`Global per-agent credit limit adjusted to $${newLimit.toLocaleString()}`);
+      alert(newLimit ? `Agent credit limit set to $${newLimit.toLocaleString()}` : 'Credit limit override cleared');
+      queryClient.invalidateQueries({ queryKey: ['agent-lender-view', agentId] });
+    }
+  });
+
+  const [inflowAmount, setInflowAmount] = useState(100);
+
+  const inflowMutation = useMutation({
+    mutationFn: () => recordInflow(agentId, inflowAmount),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent-wallet', agentId] });
+      queryClient.invalidateQueries({ queryKey: ['agent-transactions', agentId] });
+      queryClient.invalidateQueries({ queryKey: ['agent-loans', agentId] });
+    }
+  });
+
+  const taskFailureMutation = useMutation({
+    mutationFn: () => declareTaskFailure(agentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent-lender-view', agentId] });
+      queryClient.invalidateQueries({ queryKey: ['agent-wallet', agentId] });
+      queryClient.invalidateQueries({ queryKey: ['agent-transactions', agentId] });
+      queryClient.invalidateQueries({ queryKey: ['agent-loans', agentId] });
     }
   });
 
@@ -95,15 +120,19 @@ export default function LenderAgentDetail() {
   };
 
   const handleUpdateLimit = () => {
-    updatePolicyMutation.mutate();
+    creditLimitMutation.mutate();
   };
 
-  const scoreVal = scoreData ? scoreData.score : 0;
+  const scoreVal = scoreData ? toNumber(scoreData.score) : 0;
+  const taskSuccessRate = scoreData ? toNumber(scoreData.task_success_rate) : 0;
+  const spendRegularity = scoreData ? toNumber(scoreData.spend_regularity) : 0;
   const isColdStart = scoreData ? scoreData.is_cold_start : false;
   const isRevokedOrDefaulted = agent.status.toLowerCase() === "revoked" || agent.status.toLowerCase() === "defaulted";
 
   const signalProgressBars = [
     { label: "Overall Score", val: scoreVal, key: "overall", desc: "Aggregated agent risk score (0-100)." },
+    { label: "Task Success Rate", val: taskSuccessRate, key: "task_success", desc: "Percentage of tasks completed successfully." },
+    { label: "Spend Regularity", val: spendRegularity, key: "spend_regularity", desc: "Consistency and predictability of spending patterns." },
   ];
 
   return (
@@ -202,28 +231,56 @@ export default function LenderAgentDetail() {
 
             {/* Credit limit adjust panel */}
             {!isRevokedOrDefaulted && (
-              <Card role="none" className="space-y-4">
-                <h3 className="font-mono text-xs uppercase tracking-widest text-text-secondary font-bold border-b border-text-secondary/10 pb-2">
-                  Controls
-                </h3>
-                <div className="space-y-3 font-mono text-xs">
-                  <div>
-                    <label className="block text-text-secondary uppercase mb-2">Lender's global per-agent max exposure</label>
-                    <div className="flex gap-3">
-                      <input
-                        type="number"
-                        value={newLimit}
-                        onChange={(e) => setNewLimit(Number(e.target.value))}
-                        className="flex-1 px-3 py-2 bg-transparent border border-text-secondary/35 text-text-primary font-mono text-sm"
-                        min="0"
-                      />
-                      <Button variant="primary" onClick={handleUpdateLimit} className="py-2" disabled={updatePolicyMutation.isPending}>
-                        Apply
-                      </Button>
+              <>
+                <Card role="none" className="space-y-4">
+                  <h3 className="font-mono text-xs uppercase tracking-widest text-text-secondary font-bold border-b border-text-secondary/10 pb-2">
+                    Controls
+                  </h3>
+                  <div className="space-y-3 font-mono text-xs">
+                    <div>
+                      <label className="block text-text-secondary uppercase mb-2">Agent credit limit override</label>
+                      <div className="flex gap-3">
+                        <input
+                          type="number"
+                          value={newLimit}
+                          onChange={(e) => setNewLimit(Number(e.target.value))}
+                          className="flex-1 px-3 py-2 bg-transparent border border-text-secondary/35 text-text-primary font-mono text-sm"
+                          min="0"
+                        />
+                        <Button variant="primary" onClick={handleUpdateLimit} className="py-2" disabled={creditLimitMutation.isPending}>
+                          Apply
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Card>
+                </Card>
+
+                <Card role="none" className="space-y-4">
+                  <h3 className="font-mono text-xs uppercase tracking-widest text-text-secondary font-bold border-b border-text-secondary/10 pb-2">
+                    Simulate Events
+                  </h3>
+                  <div className="space-y-3 font-mono text-xs">
+                    <div>
+                      <label className="block text-text-secondary uppercase mb-2">Task payout inflow amount</label>
+                      <div className="flex gap-3">
+                        <input
+                          type="number"
+                          value={inflowAmount}
+                          onChange={(e) => setInflowAmount(Number(e.target.value))}
+                          className="flex-1 px-3 py-2 bg-transparent border border-text-secondary/35 text-text-primary font-mono text-sm"
+                          min="1"
+                        />
+                        <Button variant="primary" onClick={() => inflowMutation.mutate()} className="py-2" disabled={inflowMutation.isPending}>
+                          Simulate Inflow
+                        </Button>
+                      </div>
+                    </div>
+                    <Button variant="danger" onClick={() => taskFailureMutation.mutate()} className="w-full py-2" disabled={taskFailureMutation.isPending}>
+                      Declare Task Failure
+                    </Button>
+                  </div>
+                </Card>
+              </>
             )}
           </div>
 
@@ -265,7 +322,7 @@ export default function LenderAgentDetail() {
                         <div className="p-3 border border-text-secondary/15 hover:border-accent font-mono text-xs text-text-secondary flex justify-between items-center transition-all bg-[#F5F5F0]/70">
                           <div>
                             <span className="font-bold text-text-primary block">Loan #{l.id}</span>
-                            <span>{new Date(l.created_at).toLocaleDateString()}</span>
+                            <span>{new Date(l.issued_at).toLocaleDateString()}</span>
                           </div>
                           <div className="text-right">
                             <span className="font-bold text-text-primary block">${l.principal_amount}</span>
@@ -280,8 +337,23 @@ export default function LenderAgentDetail() {
                 <div className="space-y-2 font-mono text-xs text-text-secondary">
                   <div className="p-3 border border-text-secondary/10 flex justify-between">
                     <span>Current spendable balance</span>
-                    <span className="text-base font-bold">${walletData ? walletData.spendable_balance : '0.00'}</span>
+                    <span className="text-base font-bold">${walletData ? formatCurrency(walletData.spendable_balance) : '0.00'}</span>
                   </div>
+                  {transactions.length === 0 ? (
+                    <p className="py-4 text-center text-[11px] text-text-secondary/60 border border-dashed border-text-secondary/20">No transactions yet.</p>
+                  ) : (
+                    <div className="space-y-1 max-h-[300px] overflow-y-auto">
+                      {transactions.map((tx: TransactionOut) => (
+                        <div key={tx.id} className="p-2 border border-text-secondary/10 flex justify-between items-center bg-[#F5F5F0]/50">
+                          <div>
+                            <span className="font-bold text-text-primary block">{tx.type}</span>
+                            <span className="text-[10px] text-text-secondary/60">{formatDateTime(tx.created_at)}</span>
+                          </div>
+                          <span className="font-bold text-text-primary">${formatCurrency(tx.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </Card>

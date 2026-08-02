@@ -87,11 +87,7 @@ export default function LoanDetail() {
                 </div>
                 <div>
                   <span className="block text-[10px] text-text-secondary/70 uppercase">Issuance Date</span>
-                  <span className="font-bold text-text-primary">{new Date(loan.created_at).toLocaleString()}</span>
-                </div>
-                <div className="col-span-2">
-                  <span className="block text-[10px] text-text-secondary/70 uppercase">Approved Recipient</span>
-                  <span className="font-bold text-text-primary">{loan.approved_recipient}</span>
+                  <span className="font-bold text-text-primary">{new Date(loan.issued_at).toLocaleString()}</span>
                 </div>
               </div>
             </Card>

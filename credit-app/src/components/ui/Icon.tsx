@@ -17,7 +17,8 @@ import {
   ArrowLeft,
   X,
   Eye,
-  EyeOff
+  EyeOff,
+  RefreshCw
 } from "lucide-react";
 
 export type IconType = 
@@ -38,7 +39,8 @@ export type IconType =
   | "arrow-left"
   | "x"
   | "eye"
-  | "eye-off";
+  | "eye-off"
+  | "refresh-cw";
 
 interface IconProps {
   name: IconType;
@@ -84,6 +86,8 @@ export const Icon: React.FC<IconProps> = ({ name, className = "", size = 24 }) =
       return <Eye className={className} size={size} strokeWidth={1} />;
     case "eye-off":
       return <EyeOff className={className} size={size} strokeWidth={1} />;
+    case "refresh-cw":
+      return <RefreshCw className={className} size={size} strokeWidth={1} />;
     default:
       return null;
   }

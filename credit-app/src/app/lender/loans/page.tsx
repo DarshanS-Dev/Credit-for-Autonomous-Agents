@@ -68,7 +68,7 @@ export default function LenderLoansPage() {
                   </li>
                   <li className="flex justify-between">
                     <span className="opacity-60 uppercase tracking-wider text-xs">Issued:</span> 
-                    <span className="font-bold text-text-primary">{new Date(loan.created_at).toLocaleDateString()}</span>
+                    <span className="font-bold text-text-primary">{new Date(loan.issued_at).toLocaleDateString()}</span>
                   </li>
                 </ul>
                 <Link href={`/lender/loans/${loan.id}`}

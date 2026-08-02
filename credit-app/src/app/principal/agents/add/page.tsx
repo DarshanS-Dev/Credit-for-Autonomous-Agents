@@ -30,7 +30,7 @@ export default function AddNewAgent() {
       const keypair = loadPrincipalKeypair(session.id);
       if (!keypair) throw new Error("No signing key — log out and sign up again");
       const signed = signMandate(keypair.privateKeyHex, session.id, agent.id, DEFAULT_MANDATE_BOUNDS);
-      await signAgentMandate(agent.id, signed.bounds, signed.signatureB64);
+      await signAgentMandate(agent.id, signed.bounds, signed.signatureB64, signed.issuedAtIso);
       return agent;
     },
     onSuccess: () => {

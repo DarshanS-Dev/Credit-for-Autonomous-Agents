@@ -4,13 +4,14 @@ import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "@/context/SessionContext";
-import { getExposureStats } from "@/lib/api/lenders";
+import { getExposureStats, getLenderProfile, getInsurancePool } from "@/lib/api/lenders";
 import { getOperatorEvents } from "@/lib/api/operator";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { Doodle } from "@/components/ui/Doodle";
 import { motion, AnimatePresence } from "framer-motion";
 import { gsap } from "gsap";
+import { toNumber, formatCurrency } from "@/lib/api/types";
 
 export default function LenderDashboard() {
   const { session } = useSession();
@@ -19,6 +20,19 @@ export default function LenderDashboard() {
     queryKey: ['lender-exposure', session?.id],
     queryFn: () => getExposureStats(session?.token),
     enabled: !!session?.id,
+  });
+
+  const { data: lenderProfile } = useQuery({
+    queryKey: ['lender-profile', session?.id],
+    queryFn: () => getLenderProfile(),
+    enabled: !!session?.id,
+  });
+
+  const { data: insurancePool } = useQuery({
+    queryKey: ['insurance-pool', session?.id],
+    queryFn: () => getInsurancePool(),
+    enabled: !!session?.id,
+    refetchInterval: 10000,
   });
 
   const { data: events = [] } = useQuery({
@@ -31,7 +45,7 @@ export default function LenderDashboard() {
   const [odometerValue, setOdometerValue] = useState(0);
   const odometerRef = useRef<HTMLSpanElement>(null);
   
-  const loansCount = events.filter(e => e.event_type === 'loan_issued').length;
+  const loansCount = events.filter(e => e.event_type === 'loan_approved').length;
 
   useEffect(() => {
     if (loansCount !== odometerValue) {
@@ -47,12 +61,12 @@ export default function LenderDashboard() {
     }
   }, [loansCount, odometerValue]);
 
-  const activeAgents = stats?.active_agents || 0;
-  const defaultedAgents = stats?.defaulted_agents || 0;
-  const starterLimitAgents = 0; // Not tracked directly on backend
+  const activeAgents = stats?.active_count || 0;
+  const defaultedAgents = stats?.defaulted_count || 0;
+  const starterLimitAgents = stats?.starter_limit_count || 0;
   
-  const totalCapitalOut = stats?.total_capital_out || 0;
-  const platformCap = stats?.platform_exposure_cap || 0;
+  const totalCapitalOut = toNumber(stats?.total_capital_out);
+  const platformCap = toNumber(lenderProfile?.total_platform_exposure_cap);
 
   const totalSegments = 10;
   const activeSegments = platformCap > 0 ? Math.min(
@@ -100,7 +114,7 @@ export default function LenderDashboard() {
                   >
                     <div className="flex items-center gap-3">
                       <span className={`h-2 w-2 rounded-full ${
-                        item.event_type === "loan_issued" ? "bg-text-primary animate-pulse" :
+                        item.event_type === "loan_approved" ? "bg-text-primary animate-pulse" :
                         item.event_type.includes("revoked") || item.event_type.includes("defaulted") ? "bg-danger" : "bg-text-secondary"
                       }`} />
                       <span className="text-text-primary border border-text-primary px-1">{item.event_type}</span>
@@ -120,11 +134,11 @@ export default function LenderDashboard() {
             <div className="grid grid-cols-2 gap-4 font-mono">
               <div>
                 <span className="block text-[10px] text-text-secondary uppercase">Capital Out</span>
-                <span className="text-lg font-bold text-text-primary">${totalCapitalOut.toLocaleString()}</span>
+                <span className="text-lg font-bold text-text-primary">${formatCurrency(totalCapitalOut)}</span>
               </div>
               <div>
                 <span className="block text-[10px] text-text-secondary uppercase">Exposure Cap</span>
-                <span className="text-lg font-bold text-text-secondary">${platformCap.toLocaleString()}</span>
+                <span className="text-lg font-bold text-text-secondary">${formatCurrency(platformCap)}</span>
               </div>
             </div>
             <div className="space-y-2">
@@ -135,7 +149,7 @@ export default function LenderDashboard() {
                       key={i}
                       className={`h-5 w-3 rounded-none transition-all duration-300 ${
                         i < activeSegments 
-                          ? ((totalCapitalOut / platformCap) > 0.8 ? "bg-danger" : "bg-text-primary") 
+                          ? (platformCap > 0 && (totalCapitalOut / platformCap) > 0.8 ? "bg-danger" : "bg-text-primary") 
                           : "border border-text-primary bg-transparent"
                       }`}
                     />
@@ -155,6 +169,23 @@ export default function LenderDashboard() {
                 <span className="block text-[9px] text-text-secondary uppercase">Defaulted</span>
                 <span className="font-bold text-danger">{defaultedAgents}</span>
               </div>
+            </div>
+          </Card>
+          {/* Insurance Pool */}
+          <Card role="none" className="space-y-3 border border-accent/30">
+            <h3 className="font-mono text-xs uppercase tracking-widest text-accent font-bold border-b border-accent/10 pb-2">
+              Insurance Pool
+            </h3>
+            <div className="font-mono">
+              <span className="block text-[9px] text-text-secondary uppercase">Pool Balance</span>
+              <span className="text-xl font-bold text-text-primary">
+                ${insurancePool ? formatCurrency(insurancePool.balance) : '0.00'}
+              </span>
+              {insurancePool?.updated_at && (
+                <span className="block text-[9px] text-text-secondary/60 mt-1">
+                  Updated: {new Date(insurancePool.updated_at).toLocaleString()}
+                </span>
+              )}
             </div>
           </Card>
           <Card role="none" className="space-y-4">

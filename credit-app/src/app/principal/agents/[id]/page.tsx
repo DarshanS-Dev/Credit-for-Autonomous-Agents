@@ -9,9 +9,8 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { Modal } from "@/components/ui/Modal";
-import { getAgentDetail } from "@/lib/api/agents";
+import { getAgentDetail, revokeAgentAsPrincipal } from "@/lib/api/agents";
 import { listLoans, requestLoan } from "@/lib/api/loans";
-import { revokeAgent } from "@/lib/api/operator-actions";
 import { formatCurrency, formatDateTime, loanStatusLabel, toNumber } from "@/lib/api/types";
 import { DEFAULT_MANDATE_BOUNDS, DEMO_LENDER_ID } from "@/lib/constants";
 import { ApiError } from "@/lib/api/client";
@@ -41,7 +40,7 @@ export default function PrincipalAgentDetail() {
   });
 
   const revokeMutation = useMutation({
-    mutationFn: () => revokeAgent(agentId, "principal-initiated revocation"),
+    mutationFn: () => revokeAgentAsPrincipal(agentId, "principal-initiated revocation"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agent", agentId] });
       queryClient.invalidateQueries({ queryKey: ["agents"] });

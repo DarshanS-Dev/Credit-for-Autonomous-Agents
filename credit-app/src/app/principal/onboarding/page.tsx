@@ -50,7 +50,7 @@ export default function PrincipalOnboarding() {
         createdAgentId,
         DEFAULT_MANDATE_BOUNDS
       );
-      return signAgentMandate(createdAgentId, signed.bounds, signed.signatureB64);
+      return signAgentMandate(createdAgentId, signed.bounds, signed.signatureB64, signed.issuedAtIso);
     },
     onSuccess: () => {
       setMandateSigned(true);

@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { SpendCheckResultOut, TaskFailureResultOut } from "./types";
+import type { SpendCheckResultOut, TaskFailureResultOut, RepaymentLedgerEntry } from "./types";
 
 export function checkSpend(
   agentId: number,
@@ -29,6 +29,7 @@ export function recordInflow(
   agentId: number,
   amount: number,
   token?: string
-): Promise<unknown> {
-  return api.post(`/repayment/inflow/${agentId}`, { amount }, { token });
+): Promise<RepaymentLedgerEntry> {
+  return api.post<RepaymentLedgerEntry>(`/repayment/inflow/${agentId}`, { amount }, { token });
 }
+

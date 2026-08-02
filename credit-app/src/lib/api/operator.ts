@@ -185,4 +185,4 @@ export async function triggerPersonaFlow(
   return { agentId: agent.id, loanId: loan.id };
 }
 
-export { getOperatorEvents, revokeAgent } from "./operator-actions";
+export { getOperatorEvents, revokeAgent, triggerPersona } from "./operator-actions";

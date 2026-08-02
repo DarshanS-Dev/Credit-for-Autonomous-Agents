@@ -38,6 +38,7 @@ class TransactionType(str, enum.Enum):
     REPAYMENT = "repayment"
     TASK_PAYOUT = "task_payout"
     SPEND = "spend"
+    CROSS_AGENT_CLAWBACK = "cross_agent_clawback"
 
 
 class EventType(str, enum.Enum):
@@ -72,6 +73,7 @@ class Agent(Base):
     status: Mapped[AgentStatus] = mapped_column(
         Enum(AgentStatus), default=AgentStatus.ACTIVE, nullable=False
     )
+    vouching_enabled: Mapped[bool] = mapped_column(default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     principal: Mapped["Principal"] = relationship(back_populates="agents")
@@ -102,7 +104,9 @@ class Loan(Base):
     agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id"), nullable=False)
     lender_id: Mapped[int] = mapped_column(ForeignKey("lenders.id"), nullable=False)
     principal_amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    interest_amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False, default=0)
     outstanding_balance: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    write_off_amount: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
     status: Mapped[LoanStatus] = mapped_column(
         Enum(LoanStatus), default=LoanStatus.PENDING, nullable=False
     )

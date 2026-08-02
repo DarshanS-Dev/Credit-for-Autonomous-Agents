@@ -35,6 +35,10 @@ Cross-agent reputation sharing (cold-start innovation):
   real track record, and it never applies once the agent has its own
   AgentScore row (that's a one-time cold-start allowance, not a
   permanent subsidy).
+- Only siblings with Agent.vouching_enabled == True are considered. The
+  principal opts an agent into the fleet-trust pool (a single boolean,
+  not a per-pair consent graph) — vouching never happens silently for
+  an agent the principal hasn't enrolled.
 """
 
 from dataclasses import dataclass
@@ -179,7 +183,11 @@ def _sibling_reputation_boost(db: Session, agent: Agent) -> Decimal:
     sibling_scores = (
         db.query(AgentScore.score)
         .join(Agent, Agent.id == AgentScore.agent_id)
-        .filter(Agent.principal_id == agent.principal_id, Agent.id != agent.id)
+        .filter(
+            Agent.principal_id == agent.principal_id,
+            Agent.id != agent.id,
+            Agent.vouching_enabled.is_(True),
+        )
         .all()
     )
     if not sibling_scores:

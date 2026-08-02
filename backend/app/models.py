@@ -57,6 +57,8 @@ class Principal(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     public_key: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -153,6 +155,8 @@ class Lender(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     max_exposure_per_agent: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     total_platform_exposure_cap: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     min_score_required: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)

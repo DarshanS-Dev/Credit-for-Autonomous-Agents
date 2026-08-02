@@ -33,6 +33,11 @@ from app.database import get_db
 from app.models import Agent, AgentStatus, Principal, Event, EventType
 from app.services.credential_service import verify_mandate
 
+import jwt
+from fastapi.security import OAuth2PasswordBearer
+from app.models import Lender
+from app.services.auth_service import decode_access_token
+
 
 class CredentialInvalidError(Exception):
     """Raised internally when a mandate fails re-verification (not just non-active status)."""
@@ -144,3 +149,32 @@ def revoke_agent(db: Session, agent_id: int, reason: str) -> Agent:
         detail=reason,
     ))
     return agent
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+
+def _decode_or_401(token: str) -> dict:
+    try:
+        return decode_access_token(token)
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=http_status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+
+def get_current_principal(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> Principal:
+    payload = _decode_or_401(token)
+    if payload.get("role") != "principal":
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not a principal token")
+    principal = db.query(Principal).filter(Principal.id == int(payload["sub"])).first()
+    if principal is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Principal not found")
+    return principal
+
+
+def get_current_lender(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> Lender:
+    payload = _decode_or_401(token)
+    if payload.get("role") != "lender":
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not a lender token")
+    lender = db.query(Lender).filter(Lender.id == int(payload["sub"])).first()
+    if lender is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Lender not found")
+    return lender

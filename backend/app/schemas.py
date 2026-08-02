@@ -44,6 +44,32 @@ class EventType(str, Enum):
 class ORMBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+# ---------- Auth ----------
+
+class Role(str, Enum):
+    principal = "principal"
+    lender = "lender"
+
+
+class SignupRequest(BaseModel):
+    role: Role
+    name: str
+    email: str
+    password: str
+    public_key: Optional[str] = None  # required if role == principal
+
+
+class LoginRequest(BaseModel):
+    role: Role
+    email: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    role: Role
+    id: int
 
 # ---------- Principal ----------
 

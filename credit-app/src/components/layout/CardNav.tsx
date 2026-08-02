@@ -1,6 +1,7 @@
-import React, { useLayoutEffect, useRef, useState } from 'react';
+import React, { useLayoutEffect, useRef, useState, useEffect } from 'react';
 import { gsap } from 'gsap';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Icon } from '../ui/Icon';
 import './CardNav.css';
 
@@ -47,6 +48,7 @@ const CardNav: React.FC<CardNavProps> = ({
   const navRef = useRef<HTMLElement>(null);
   const cardsRef = useRef<(HTMLDivElement | null)[]>([]);
   const tlRef = useRef<gsap.core.Timeline | null>(null);
+  const pathname = usePathname();
 
   const calculateHeight = () => {
     const navEl = navRef.current;
@@ -142,6 +144,29 @@ const CardNav: React.FC<CardNavProps> = ({
     return () => window.removeEventListener('resize', handleResize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isExpanded]);
+
+  // FIX: CardNav lives inside Nav, which sits in layout.tsx — so it stays
+  // mounted across client-side route changes instead of remounting fresh
+  // per page. Previously nothing here ever reacted to navigation, so if a
+  // user opened the menu and clicked one of the nav-card-links, the route
+  // changed underneath the menu but isExpanded/isHamburgerOpen never reset
+  // — the expanded panel stayed open (and stayed sized for the OLD page's
+  // content) on top of the new page. This effect collapses the menu
+  // automatically whenever the pathname changes, using the same reverse
+  // path toggleMenu() already uses so it stays visually consistent.
+  const previousPathnameRef = useRef(pathname);
+  useEffect(() => {
+    if (previousPathnameRef.current === pathname) return;
+    previousPathnameRef.current = pathname;
+
+    if (isExpanded && tlRef.current) {
+      setIsHamburgerOpen(false);
+      const tl = tlRef.current;
+      tl.eventCallback('onReverseComplete', () => setIsExpanded(false));
+      tl.reverse();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   const toggleMenu = () => {
     const tl = tlRef.current;

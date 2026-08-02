@@ -14,7 +14,8 @@ const nextConfig = {
     // Proxies every /api/* call to the FastAPI backend server-side, so the
     // browser only ever talks to same-origin Next.js. Avoids needing CORS
     // middleware on the backend (which we can't add — frontend-only change).
-    const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
+    const backendUrl =
+      process.env.BACKEND_URL ?? "https://credit-for-autonomous-agents.onrender.com";
     return [
       {
         source: "/api/:path*",

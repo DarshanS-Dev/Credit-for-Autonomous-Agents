@@ -67,7 +67,7 @@ def is_credential_currently_valid(agent: Agent, principal: Principal) -> bool:
     callers (e.g. a dashboard listing many agents) can use it without
     exception-handling per agent.
     """
-    if agent.status != AgentStatus.active:
+    if agent.status != AgentStatus.ACTIVE:
         return False
 
     try:

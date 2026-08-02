@@ -116,6 +116,8 @@ class Loan(Base):
     credit_limit_at_issuance: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    score_at_decision: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
+    policy_min_score_at_decision: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
 
     agent: Mapped["Agent"] = relationship(back_populates="loans")
     lender: Mapped["Lender"] = relationship(back_populates="loans")

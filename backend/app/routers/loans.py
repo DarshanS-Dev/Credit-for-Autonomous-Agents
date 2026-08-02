@@ -22,7 +22,17 @@ Decision rationale numbers (score_at_decision, policy_min_score) are
 persisted on the Loan row at creation time, not recomputed later --
 Loan Detail must show what was true AT THE TIME of the decision, never
 the agent's current live score.
+
+Manual credit limit override: if a lender has set
+Agent.manual_credit_limit_override (agents.py PUT /{agent_id}/credit-limit),
+it's applied here as the FINAL number used for credit_limit_at_issuance
+on an approved loan -- downstream of both underwriting_service and
+policy_engine, same way cold-start's flat COLD_START_LIMIT is downstream
+of the score formula. It never changes whether the loan is approved,
+only what limit gets recorded once it already is.
 """
+
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -143,6 +153,19 @@ def request_loan(
         db.refresh(loan)
         return _build_loan_detail(db, loan)
 
+    # Manual credit-limit override (agents.py PUT /{agent_id}/credit-limit)
+    # is applied here as the final clamp -- downstream of both
+    # underwriting_service and policy_engine, same pattern as cold-start's
+    # flat limit. It never changes final_approved, only the recorded limit.
+    final_limit = policy.final_limit
+    explanation = policy.explanation
+    if agent.manual_credit_limit_override is not None:
+        final_limit = Decimal(agent.manual_credit_limit_override)
+        explanation += (
+            f"; lender manually overrode this agent's limit to {final_limit} "
+            f"(was {policy.final_limit} from score/policy)"
+        )
+
     loan = Loan(
         agent_id=agent.id,
         lender_id=lender.id,
@@ -150,7 +173,7 @@ def request_loan(
         interest_amount=0,
         outstanding_balance=payload.principal_amount,
         status=LoanStatus.APPROVED,
-        credit_limit_at_issuance=policy.final_limit,
+        credit_limit_at_issuance=final_limit,
         approved_recipient=payload.approved_recipient,
         score_at_decision=underwriting.score_at_decision,
         policy_min_score_at_decision=underwriting.policy_min_score,
@@ -163,7 +186,7 @@ def request_loan(
         agent_id=agent.id,
         loan_id=loan.id,
         event_type=EventType.LOAN_APPROVED,
-        detail=policy.explanation,
+        detail=explanation,
     ))
 
     db.commit()

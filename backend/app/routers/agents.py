@@ -3,8 +3,9 @@ agents.py
 
 Principal-side agent lifecycle (create -> sign delegation mandate -> view)
 plus Lender-side read views into an agent (directory detail, score
-breakdown). Loan/repayment/spend actions live in loans.py and
-repayment.py -- this router is identity + roster only.
+breakdown, transaction ledger, credit limit override) and the principal's
+own kill switch. Loan/repayment/spend actions live in loans.py and
+repayment.py -- this router is identity + roster + lender-facing controls.
 
 Ownership: every principal-scoped endpoint checks agent.principal_id ==
 current_principal.id, returning 404 (not 403) on mismatch -- deliberately
@@ -19,17 +20,20 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Agent, AgentScore, Wallet
+from app.models import Agent, AgentScore, Wallet, Transaction, AgentStatus as ModelAgentStatus
 from app.schemas import (
     AgentCreate,
     AgentOut,
     AgentRosterItem,
     AgentDetailPrincipalOut,
+    AgentRevokeRequest,
     DelegationMandateSign,
     WalletOut,
     AgentScoreOut,
+    CreditLimitUpdate,
+    TransactionOut,
 )
-from app.dependencies import get_current_principal, get_current_lender
+from app.dependencies import get_current_principal, get_current_lender, revoke_agent
 from app.services.credential_service import verify_mandate
 from app.services import underwriting_service
 
@@ -92,6 +96,20 @@ def sign_mandate(
     principal=Depends(get_current_principal),
     db: Session = Depends(get_db),
 ):
+    """
+    Step 2 of Onboarding: principal has signed the canonical mandate
+    payload client-side (their private key never reaches us), including
+    the exact issued_at timestamp they signed against. We verify it once
+    here using that same issued_at (NOT a freshly generated one -- using
+    a new timestamp here would make verification fail against virtually
+    every real signature) before persisting, and store the raw components
+    as the JSON blob dependencies.py expects to re-verify on every future
+    loan/repayment request.
+
+    Rejects (422) if the signature doesn't verify against the principal's
+    stored public_key -- this is the only place a bad mandate can be
+    caught before it's trusted for the agent's whole lifetime.
+    """
     agent = _get_owned_agent_or_404(db, agent_id, principal.id)
 
     valid = verify_mandate(
@@ -100,7 +118,7 @@ def sign_mandate(
         principal_id=principal.id,
         agent_id=agent.id,
         bounds=payload.bounds,
-        issued_at=payload.issued_at,   # <-- use the client's issued_at, not a new one
+        issued_at=payload.issued_at,
     )
     if not valid:
         raise HTTPException(
@@ -110,7 +128,7 @@ def sign_mandate(
 
     agent.delegation_mandate = json.dumps({
         "bounds": payload.bounds,
-        "issued_at": payload.issued_at.isoformat(),   # <-- store client's issued_at
+        "issued_at": payload.issued_at.isoformat(),
         "signature": payload.signature,
     })
     db.commit()
@@ -185,6 +203,39 @@ def get_agent_wallet(
     return wallet
 
 
+@router.post("/{agent_id}/revoke", response_model=AgentOut)
+def principal_revoke_agent(
+    agent_id: int,
+    payload: AgentRevokeRequest = AgentRevokeRequest(),
+    principal=Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
+    """
+    Principal/Agent Detail 'Agent controls -> Manually revoke the agent's
+    delegation credential'. Distinct from the Operator Console's kill
+    switch and from an automatic monitoring/task-failure default:
+
+    - This one: voluntary, principal-initiated -> AgentStatus.REVOKED
+    - Operator kill switch (admin.py): manual, intended-as-permanent ban
+      -> AgentStatus.BLACKLISTED
+    - Automatic (monitoring_service.py / repayment.py task-failure):
+      behavior-triggered -> AgentStatus.DEFAULTED
+
+    All three go through the same revoke_agent() so there's still exactly
+    one function in the codebase that flips Agent.status.
+    """
+    agent = _get_owned_agent_or_404(db, agent_id, principal.id)
+    agent = revoke_agent(
+        db,
+        agent_id=agent.id,
+        reason=payload.reason,
+        target_status=ModelAgentStatus.REVOKED,
+    )
+    db.commit()
+    db.refresh(agent)
+    return agent
+
+
 # ---------- Lender-facing views ----------
 # No ownership check by principal_id -- any authenticated lender can view
 # any agent's public underwriting profile, same as the Agent Directory
@@ -201,7 +252,8 @@ def get_agent_for_lender(
     since the fields a lender needs to see (name, status, mandate,
     credential_active) are identical to the principal's own view -- score
     breakdown and loan/transaction history are separate endpoints
-    (get_agent_score below, and loans.py) to keep each response focused.
+    (get_agent_score / get_agent_transactions below, and loans.py) to
+    keep each response focused.
     """
     agent = db.query(Agent).filter(Agent.id == agent_id).first()
     if agent is None:
@@ -256,3 +308,60 @@ def get_agent_score(
         computed_at=score.computed_at,
         is_cold_start=False,
     )
+
+
+@router.get("/{agent_id}/transactions", response_model=list[TransactionOut])
+def get_agent_transactions(
+    agent_id: int,
+    lender=Depends(get_current_lender),
+    db: Session = Depends(get_db),
+):
+    """
+    Lender/Agent Detail 'Ledger of custodial wallet inflows and automatic
+    repayment deductions'. No ownership restriction (same posture as
+    get_agent_for_lender / get_agent_score above) -- a lender evaluating
+    whether to fund an agent needs to see its full transaction history,
+    not just loans it originated itself.
+
+    Ordered newest-first to match how a ledger view is normally read.
+    """
+    agent = db.query(Agent).filter(Agent.id == agent_id).first()
+    if agent is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Agent not found")
+
+    return (
+        db.query(Transaction)
+        .filter(Transaction.agent_id == agent_id)
+        .order_by(Transaction.created_at.desc())
+        .all()
+    )
+
+
+@router.put("/{agent_id}/credit-limit", response_model=AgentOut)
+def set_agent_credit_limit(
+    agent_id: int,
+    payload: CreditLimitUpdate,
+    lender=Depends(get_current_lender),
+    db: Session = Depends(get_db),
+):
+    """
+    Lender/Agent Detail 'manually adjust this agent's individual credit
+    limit within policy bounds'. Stores a flat override on the agent row
+    (Agent.manual_credit_limit_override) that loans.py applies as a final
+    clamp on the NEXT loan request -- it does not touch any currently
+    open loan, and does not itself validate against the lender's own
+    max_exposure_per_agent (that check still happens the normal way, in
+    policy_engine, at request time; this endpoint only sets what number
+    gets used downstream of that).
+
+    Passing credit_limit=null clears the override, reverting the agent to
+    normal score/policy-derived limits.
+    """
+    agent = db.query(Agent).filter(Agent.id == agent_id).first()
+    if agent is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Agent not found")
+
+    agent.manual_credit_limit_override = payload.credit_limit
+    db.commit()
+    db.refresh(agent)
+    return agent

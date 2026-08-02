@@ -78,6 +78,18 @@ class Agent(Base):
         Enum(AgentStatus), default=AgentStatus.ACTIVE, nullable=False
     )
     vouching_enabled: Mapped[bool] = mapped_column(default=False, nullable=False)
+    manual_credit_limit_override: Mapped[float | None] = mapped_column(
+        Numeric(18, 2), nullable=True
+    )
+    # Lender-set custom credit ceiling for this specific agent, overriding
+    # whatever underwriting_service/policy_engine would otherwise compute
+    # at the next loan request. NULL means "no override, use the normal
+    # score/policy-derived limit" -- this is deliberately opt-in per agent,
+    # not a system-wide default. Only ever read at loan-request time
+    # (loans.py); underwriting_service and policy_engine are untouched and
+    # keep computing their own numbers regardless -- the override is
+    # applied as a final clamp downstream of both, same pattern as
+    # cold-start's flat limit.
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     principal: Mapped["Principal"] = relationship(back_populates="agents")

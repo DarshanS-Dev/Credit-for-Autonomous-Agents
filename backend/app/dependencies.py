@@ -122,18 +122,30 @@ def get_active_agent_with_valid_credential(
 
     return agent
 
-def revoke_agent(db: Session, agent_id: int, reason: str) -> Agent:
+
+def revoke_agent(
+    db: Session,
+    agent_id: int,
+    reason: str,
+    target_status: AgentStatus = AgentStatus.DEFAULTED,
+) -> Agent:
     """
     Single place in the codebase permitted to flip Agent.status to a
-    non-active state. Called by monitoring_service.py on a confirmed
-    default/unauthorized-payment case, and reusable as-is by a manual
-    Operator Console kill switch later -- same function, same guarantee,
-    no duplicated status-mutation logic anywhere else.
+    non-active state. Reused identically by three distinct call sites,
+    each passing the target_status that matches what actually happened —
+    this keeps "one function flips status" true while still distinguishing
+    the three cases the sitemap and enum both call out separately:
 
-    Defaults to AgentStatus.DEFAULTED (this is the automatic,
-    behavior-triggered path). BLACKLISTED is reserved for a distinct,
-    explicit manual action (e.g. an operator permanently banning an
-    agent after review) and is intentionally not set here.
+    - target_status=AgentStatus.DEFAULTED (default): the automatic,
+      behavior-triggered path — monitoring_service.py on a confirmed
+      unauthorized-payment attempt, or repayment.py on a task-failure
+      default. Left as the default value so every existing call site
+      that doesn't pass target_status explicitly keeps its current
+      behavior unchanged.
+    - target_status=AgentStatus.REVOKED: principal-initiated, voluntary
+      shutoff of their own agent (Principal/Agent Detail "Agent controls").
+    - target_status=AgentStatus.BLACKLISTED: operator-initiated, manual,
+      intended-as-permanent ban (Operator Console kill switch).
 
     Does not commit -- caller owns the transaction boundary, same
     convention as ledger_service.process_inflow() / declare_default().
@@ -142,13 +154,14 @@ def revoke_agent(db: Session, agent_id: int, reason: str) -> Agent:
     if agent is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    agent.status = AgentStatus.DEFAULTED
+    agent.status = target_status
     db.add(Event(
         agent_id=agent.id,
         event_type=EventType.REVOKED,
         detail=reason,
     ))
     return agent
+
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 

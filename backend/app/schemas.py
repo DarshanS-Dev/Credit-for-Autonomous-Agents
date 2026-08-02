@@ -102,7 +102,7 @@ class DelegationMandateSign(BaseModel):
     """Payload the principal signs to create the agent<->principal link."""
     agent_id: int
     bounds: str  # human-readable terms of authorization shown at Onboarding step
-    issued_at: datetime
+    issued_at: datetime  # must match exactly what was signed client-side
     signature: str  # Ed25519 signature over the canonical mandate payload
 
 
@@ -129,6 +129,25 @@ class AgentDetailPrincipalOut(ORMBase):
     status: AgentStatus
     delegation_mandate: str
     credential_active: bool
+
+
+class AgentRevokeRequest(BaseModel):
+    """Body for the principal's own 'revoke my agent' action (Agent Detail
+    controls). Optional reason for the Event log / alerts feed."""
+    reason: Optional[str] = "principal-initiated revocation"
+
+
+class CreditLimitUpdate(BaseModel):
+    """
+    Lender/Agent Detail 'manually adjust this agent's individual credit
+    limit' control. Setting credit_limit to null clears the override and
+    reverts the agent to normal score/policy-derived limits on its next
+    loan request.
+    """
+    credit_limit: Optional[Decimal] = Field(
+        default=None,
+        description="New flat limit for this agent's next loan request. Null clears the override."
+    )
 
 
 # ---------- Wallet ----------
@@ -295,6 +314,27 @@ class InsurancePoolOut(BaseModel):
 
 class PersonaTrigger(BaseModel):
     persona: str  # "established" | "new" | "misbehaving"
+
+
+class PersonaTriggerResult(BaseModel):
+    """
+    Response for POST /operator/persona-trigger. Summarizes the full
+    scripted flow that was just run (fresh demo principal/lender/agent
+    spun up server-side, loan requested, and -- for the misbehaving
+    persona -- the default sequence) so the Operator Console can narrate
+    the outcome without the frontend needing to orchestrate multiple
+    calls itself.
+    """
+    persona: str
+    agent_id: int
+    agent_status: str
+    loan_id: Optional[int] = None
+    loan_status: Optional[str] = None
+    credit_limit_at_issuance: Optional[Decimal] = None
+    is_cold_start: Optional[bool] = None
+    insurance_payout: Optional[Decimal] = None
+    final_write_off_amount: Optional[Decimal] = None
+    explanation: str
 
 
 class ExposureStats(BaseModel):

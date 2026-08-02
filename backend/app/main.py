@@ -1,10 +1,20 @@
 """main.py — FastAPI app entrypoint, wires all routers together."""
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware 
 
 from app.routers import auth, agents, loans, repayment, lenders, admin
 
 app = FastAPI(title="Credit for Autonomous Agents")
+
+# 2. Configure and add the CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],          
+    allow_credentials=True,
+    allow_methods=["*"],         
+    allow_headers=["*"],         
+)
 
 app.include_router(auth.router)
 app.include_router(agents.router)

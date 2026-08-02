@@ -30,7 +30,7 @@ from fastapi import Depends, HTTPException, status as http_status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Agent, AgentStatus, Principal
+from app.models import Agent, AgentStatus, Principal, Event, EventType
 from app.services.credential_service import verify_mandate
 
 
@@ -115,4 +115,32 @@ def get_active_agent_with_valid_credential(
             detail=f"Agent credential is not valid for use (status={agent.status.value})",
         )
 
+    return agent
+
+def revoke_agent(db: Session, agent_id: int, reason: str) -> Agent:
+    """
+    Single place in the codebase permitted to flip Agent.status to a
+    non-active state. Called by monitoring_service.py on a confirmed
+    default/unauthorized-payment case, and reusable as-is by a manual
+    Operator Console kill switch later -- same function, same guarantee,
+    no duplicated status-mutation logic anywhere else.
+
+    Defaults to AgentStatus.DEFAULTED (this is the automatic,
+    behavior-triggered path). BLACKLISTED is reserved for a distinct,
+    explicit manual action (e.g. an operator permanently banning an
+    agent after review) and is intentionally not set here.
+
+    Does not commit -- caller owns the transaction boundary, same
+    convention as ledger_service.process_inflow() / declare_default().
+    """
+    agent = db.query(Agent).filter(Agent.id == agent_id).first()
+    if agent is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Agent not found")
+
+    agent.status = AgentStatus.DEFAULTED
+    db.add(Event(
+        agent_id=agent.id,
+        event_type=EventType.REVOKED,
+        detail=reason,
+    ))
     return agent

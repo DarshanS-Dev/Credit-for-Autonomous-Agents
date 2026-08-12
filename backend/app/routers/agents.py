@@ -411,6 +411,9 @@ def upload_task_history(
     db.bulk_save_objects(task_records)
     db.commit()
 
+    underwriting_service.recompute_and_store_score(db, agent)
+    db.commit()
+
     return {
         "agent_id": agent.id,
         "rows_imported": len(task_records),

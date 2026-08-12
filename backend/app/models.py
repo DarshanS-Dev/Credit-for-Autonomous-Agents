@@ -98,6 +98,7 @@ class Agent(Base):
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="agent")
     score: Mapped["AgentScore"] = relationship(back_populates="agent", uselist=False)
     events: Mapped[list["Event"]] = relationship(back_populates="agent")
+    task_records: Mapped[list["TaskRecord"]] = relationship(back_populates="agent")
 
 
 class Wallet(Base):
@@ -214,3 +215,24 @@ class InsurancePool(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+class TaskRecord(Base):
+    """
+    Principal-attested, unverified pre-platform task history imported via
+    CSV. Deliberately separate from Transaction (ledger-verified real money
+    movement) -- see upload endpoint docstring for why these must never be
+    conflated.
+    """
+    __tablename__ = "task_records"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id"), nullable=False)
+    task_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    success: Mapped[bool] = mapped_column(nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    recipient: Mapped[str] = mapped_column(String(255), nullable=False)
+    source: Mapped[str] = mapped_column(String(50), default="csv_upload", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    agent: Mapped["Agent"] = relationship(back_populates="task_records")

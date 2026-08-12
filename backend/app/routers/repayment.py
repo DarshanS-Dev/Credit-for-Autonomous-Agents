@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Agent, Loan, LoanStatus
 from app.schemas import RepaymentLedgerEntry, SpendCheckResultOut, TaskFailureResultOut
-from app.dependencies import get_active_agent_with_valid_credential, revoke_agent
+from app.dependencies import get_active_agent_with_key_and_credential, revoke_agent
 from app.services import ledger_service, monitoring_service
 
 router = APIRouter(prefix="/repayment", tags=["repayment"])
@@ -52,7 +52,7 @@ def _get_open_loan_or_404(db: Session, agent_id: int) -> Loan:
 def record_inflow(
     payload: InflowRequest,
     db: Session = Depends(get_db),
-    agent: Agent = Depends(get_active_agent_with_valid_credential),
+    agent: Agent = Depends(get_active_agent_with_key_and_credential),
 ):
     """
     Simulates a task payout landing for the agent. In the real system this
@@ -79,7 +79,7 @@ def record_inflow(
 def check_spend(
     payload: SpendCheckRequest,
     db: Session = Depends(get_db),
-    agent: Agent = Depends(get_active_agent_with_valid_credential),
+    agent: Agent = Depends(get_active_agent_with_key_and_credential),
 ):
     """
     Evaluates whether a spend attempt matches the loan's approved purpose.
@@ -109,7 +109,7 @@ def check_spend(
 @router.post("/task-failure/{agent_id}", response_model=TaskFailureResultOut)
 def declare_task_failure(
     db: Session = Depends(get_db),
-    agent: Agent = Depends(get_active_agent_with_valid_credential),
+    agent: Agent = Depends(get_active_agent_with_key_and_credential),
 ):
     """
     Task failure is a distinct default trigger from spend misuse -- there's

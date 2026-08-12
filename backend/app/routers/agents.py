@@ -92,8 +92,10 @@ def create_agent(
 
     return agent
 
+from app.services.credential_service import verify_mandate, generate_agent_api_key, hash_agent_api_key
+from app.schemas import AgentMandateOut
 
-@router.post("/{agent_id}/mandate", response_model=AgentOut)
+@router.post("/{agent_id}/mandate", response_model=AgentMandateOut)
 def sign_mandate(
     agent_id: int,
     payload: DelegationMandateSign,
@@ -101,18 +103,12 @@ def sign_mandate(
     db: Session = Depends(get_db),
 ):
     """
-    Step 2 of Onboarding: principal has signed the canonical mandate
-    payload client-side (their private key never reaches us), including
-    the exact issued_at timestamp they signed against. We verify it once
-    here using that same issued_at (NOT a freshly generated one -- using
-    a new timestamp here would make verification fail against virtually
-    every real signature) before persisting, and store the raw components
-    as the JSON blob dependencies.py expects to re-verify on every future
-    loan/repayment request.
-
-    Rejects (422) if the signature doesn't verify against the principal's
-    stored public_key -- this is the only place a bad mandate can be
-    caught before it's trusted for the agent's whole lifetime.
+    Step 2 of Onboarding (see original docstring for mandate-verification
+    detail, unchanged below). NEW: on successful verification, also mints
+    this agent's bearer API key -- the credential every subsequent
+    loan/repayment request must present via X-Agent-Key to prove the
+    caller actually is this agent, not just that the agent_id in the path
+    is currently active. Raw key is returned exactly once, here.
     """
     agent = _get_owned_agent_or_404(db, agent_id, principal.id)
 
@@ -135,9 +131,21 @@ def sign_mandate(
         "issued_at": payload.issued_at.isoformat(),
         "signature": payload.signature,
     })
+
+    raw_api_key = generate_agent_api_key()
+    agent.api_key_hash = hash_agent_api_key(raw_api_key)
+
     db.commit()
     db.refresh(agent)
-    return agent
+
+    return AgentMandateOut(
+        id=agent.id,
+        principal_id=agent.principal_id,
+        name=agent.name,
+        status=agent.status,
+        created_at=agent.created_at,
+        api_key=raw_api_key,
+    )
 
 
 # ---------- Principal: roster + detail ----------

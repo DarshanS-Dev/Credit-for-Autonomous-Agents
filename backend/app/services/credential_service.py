@@ -157,3 +157,48 @@ def generate_keypair() -> tuple[str, str]:
 def load_private_key(private_key_b64: str) -> Ed25519PrivateKey:
     """Reconstruct a private key from raw base64 bytes. Seed/test use only."""
     return Ed25519PrivateKey.from_private_bytes(_b64decode(private_key_b64))
+
+# ---------- Agent API key (bearer credential, separate from the mandate) ----------
+#
+# The Ed25519 mandate above proves "was this agent ever legitimately
+# delegated by its principal." It says nothing about whether a given HTTP
+# request claiming to be that agent actually IS that agent -- agent_id is
+# a bare path param, not a secret. This key is what closes that gap: a
+# per-agent bearer secret, minted once at mandate-signing time, checked on
+# every subsequent agent-scoped request via a header.
+#
+# HMAC-SHA256 (not bcrypt) deliberately -- bcrypt's slowness is correct for
+# rarely-checked human passwords (auth_service.py), but this gets checked
+# on every loan/repayment call, a hot path. HMAC with a server-side pepper
+# keeps it fast while still not being a bare, reversible hash lookup.
+#
+# TODO (post-today): agent_api_key_pepper currently defaults to
+# jwt_secret_key (see config.py) -- fine for the 1-day push, but these are
+# conceptually different secrets (session auth vs. per-agent bearer auth)
+# and should get their own env var before this sees real traffic.
+
+import hmac
+import hashlib
+import secrets
+
+from app.config import settings
+
+
+def generate_agent_api_key() -> str:
+    """Raw secret returned to the principal exactly once, at mandate-signing
+    time. Never stored or logged in this form -- only its hash is kept."""
+    return secrets.token_urlsafe(32)
+
+
+def hash_agent_api_key(raw_key: str) -> str:
+    """HMAC-SHA256 keyed with the server pepper, hex-encoded for storage."""
+    return hmac.new(
+        settings.agent_api_key_pepper.encode("utf-8"),
+        raw_key.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def verify_agent_api_key(raw_key: str, stored_hash: str) -> bool:
+    """Constant-time compare -- avoids leaking hash-match info via timing."""
+    return hmac.compare_digest(hash_agent_api_key(raw_key), stored_hash)

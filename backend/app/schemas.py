@@ -136,6 +136,16 @@ class AgentRevokeRequest(BaseModel):
     controls). Optional reason for the Event log / alerts feed."""
     reason: Optional[str] = "principal-initiated revocation"
 
+class AgentMandateOut(AgentOut):
+    """
+    Response for POST /agents/{agent_id}/mandate. Extends AgentOut with the
+    raw api_key -- the ONLY response in the whole API that ever carries the
+    raw key. Not persisted or logged anywhere in this form; only its hash
+    (credential_service.hash_agent_api_key) is stored, on Agent.api_key_hash.
+    The principal must capture it now -- there is no "view it again" endpoint
+    by design, only regeneration (not built today, see gaps list).
+    """
+    api_key: str
 
 class CreditLimitUpdate(BaseModel):
     """

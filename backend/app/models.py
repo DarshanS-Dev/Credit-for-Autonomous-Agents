@@ -90,6 +90,12 @@ class Agent(Base):
     # keep computing their own numbers regardless -- the override is
     # applied as a final clamp downstream of both, same pattern as
     # cold-start's flat limit.
+    api_key_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # HMAC-SHA256 hash of the per-agent bearer key (credential_service.py),
+    # minted once at mandate-signing time. Nullable because existing agents
+    # predate this column and have no key yet -- until backfilled, any
+    # dependency checking this must treat NULL as "key auth not set up for
+    # this agent" and reject (fail closed), not skip the check.
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     principal: Mapped["Principal"] = relationship(back_populates="agents")

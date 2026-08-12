@@ -40,7 +40,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Agent, Event, EventType, Loan, LoanStatus, Lender
 from app.schemas import LoanRequest, LoanOut, LoanDetailOut, LoanDecisionRationale, StatusHistoryEntry
-from app.dependencies import get_active_agent_with_valid_credential
+from app.dependencies import get_active_agent_with_key_and_credential
 from app.services import underwriting_service, policy_engine, ledger_service
 
 router = APIRouter(prefix="/loans", tags=["loans"])
@@ -106,7 +106,7 @@ def _latest_decision_explanation(db: Session, loan_id: int) -> str:
 def request_loan(
     payload: LoanRequest,
     db: Session = Depends(get_db),
-    agent: Agent = Depends(get_active_agent_with_valid_credential),
+    agent: Agent = Depends(get_active_agent_with_key_and_credential),
 ):
     existing_open = (
         db.query(Loan)

@@ -38,6 +38,9 @@ from fastapi.security import OAuth2PasswordBearer
 from app.models import Lender
 from app.services.auth_service import decode_access_token
 
+from fastapi import Header
+from app.services.credential_service import verify_agent_api_key
+
 
 class CredentialInvalidError(Exception):
     """Raised internally when a mandate fails re-verification (not just non-active status)."""
@@ -191,3 +194,58 @@ def get_current_lender(token: str = Depends(oauth2_scheme), db: Session = Depend
     if lender is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Lender not found")
     return lender
+
+def get_active_agent_with_key_and_credential(
+    agent_id: int,
+    x_agent_key: str = Header(..., alias="X-Agent-Key"),
+    db: Session = Depends(get_db),
+) -> Agent:
+    """
+    Use this instead of get_active_agent_with_valid_credential wherever the
+    caller is claiming to BE the agent (loans.py request_loan, all of
+    repayment.py) -- i.e. anywhere a bare path agent_id was previously
+    trusted with no proof the request actually came from that agent.
+
+    Order of checks, deliberately fail-closed at each step:
+    1. Agent exists                              -> else 404
+    2. Agent has an api_key_hash set at all       -> else 403 (agent was
+       never issued a key -- e.g. predates this feature, or mandate was
+       never signed via the endpoint that mints one)
+    3. X-Agent-Key header matches the stored hash -> else 401 (this is an
+       authentication failure, distinct from "valid caller, wrong agent
+       state," which is why it's checked BEFORE mandate/status validity)
+    4. Existing mandate + active-status check (is_credential_currently_valid)
+       -> else 403, same as the current dependency
+
+    Does not replace get_active_agent_with_valid_credential -- lender-facing
+    reads (agents.py score/lender-view/transactions) are correctly NOT
+    agent-authenticated; they go through lender JWT instead and should keep
+    using the plain agent lookup, not this.
+    """
+    agent = db.query(Agent).filter(Agent.id == agent_id).first()
+    if agent is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Agent not found")
+
+    if not agent.api_key_hash:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="Agent has no API key configured; re-sign mandate to obtain one",
+        )
+
+    if not verify_agent_api_key(x_agent_key, agent.api_key_hash):
+        raise HTTPException(status_code=http_status.HTTP_401_UNAUTHORIZED, detail="Invalid agent API key")
+
+    principal = db.query(Principal).filter(Principal.id == agent.principal_id).first()
+    if principal is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Agent has no associated principal",
+        )
+
+    if not is_credential_currently_valid(agent, principal):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail=f"Agent credential is not valid for use (status={agent.status.value})",
+        )
+
+    return agent

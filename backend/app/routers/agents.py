@@ -37,6 +37,10 @@ from app.dependencies import get_current_principal, get_current_lender, revoke_a
 from app.services.credential_service import verify_mandate
 from app.services import underwriting_service
 
+from fastapi import UploadFile, File
+from app.models import TaskRecord
+from app.services.csv_import_service import parse_task_history_csv, CSVValidationError
+
 router = APIRouter(prefix="/agents", tags=["agents"])
 
 
@@ -365,3 +369,49 @@ def set_agent_credit_limit(
     db.commit()
     db.refresh(agent)
     return agent
+
+# ---------- Principal: CSV task history upload ----------
+
+@router.post("/{agent_id}/upload-history", status_code=status.HTTP_201_CREATED)
+def upload_task_history(
+    agent_id: int,
+    file: UploadFile = File(...),
+    principal=Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
+    """
+    Principal uploads a CSV of pre-platform task history for their agent.
+    Validate-all-before-commit-any: csv_import_service either returns every
+    row parsed clean, or raises and nothing touches the DB.
+
+    Rows are inserted as TaskRecord (principal-attested, unverified) --
+    never Transaction (ledger-verified). AgentScore recompute from this
+    data is wired separately in underwriting_service.
+    """
+    agent = _get_owned_agent_or_404(db, agent_id, principal.id)
+
+    raw_bytes = file.file.read()
+
+    try:
+        parsed_rows = parse_task_history_csv(raw_bytes)
+    except CSVValidationError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
+
+    task_records = [
+        TaskRecord(
+            agent_id=agent.id,
+            task_id=row.task_id,
+            completed_at=row.completed_at,
+            success=row.success,
+            amount=row.amount,
+            recipient=row.recipient,
+        )
+        for row in parsed_rows
+    ]
+    db.bulk_save_objects(task_records)
+    db.commit()
+
+    return {
+        "agent_id": agent.id,
+        "rows_imported": len(task_records),
+    }

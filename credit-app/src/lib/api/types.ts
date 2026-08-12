@@ -66,6 +66,15 @@ export interface LenderOut {
   updated_at: string;
 }
 
+export interface LenderDirectoryEntry {
+  id: number;
+  name: string;
+  min_score_required: string | number;
+  max_exposure_per_agent: string | number;
+  total_platform_exposure_cap: string | number;
+  allowed_agent_categories: string[];
+}
+
 export interface ExposureStats {
   total_capital_out: string | number;
   active_count: number;

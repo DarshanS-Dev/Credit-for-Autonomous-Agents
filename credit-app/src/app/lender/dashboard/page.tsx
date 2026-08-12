@@ -4,30 +4,17 @@ import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "@/context/SessionContext";
-import { getExposureStats, getLenderProfile, getInsurancePool } from "@/lib/api/lenders";
+import { getInsurancePool } from "@/lib/api/lenders";
 import { getOperatorEvents } from "@/lib/api/operator";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { Doodle } from "@/components/ui/Doodle";
 import { LiveActivityFeed } from "@/components/lender/LiveActivityFeed";
-import { ExposureDetailDrawer } from "@/components/lender/ExposureDetailDrawer";
 import { gsap } from "gsap";
-import { toNumber, formatCurrency } from "@/lib/api/types";
+import { formatCurrency } from "@/lib/api/types";
 
 export default function LenderDashboard() {
   const { session } = useSession();
-
-  const { data: stats } = useQuery({
-    queryKey: ['lender-exposure', session?.id],
-    queryFn: () => getExposureStats(session?.token),
-    enabled: !!session?.id,
-  });
-
-  const { data: lenderProfile } = useQuery({
-    queryKey: ['lender-profile', session?.id],
-    queryFn: () => getLenderProfile(),
-    enabled: !!session?.id,
-  });
 
   const { data: insurancePool } = useQuery({
     queryKey: ['insurance-pool', session?.id],
@@ -45,9 +32,7 @@ export default function LenderDashboard() {
 
   const [odometerValue, setOdometerValue] = useState(0);
   const odometerRef = useRef<HTMLSpanElement>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<string | null>(null);
-  
+
   const loansCount = events.filter(e => e.event_type === 'loan_approved').length;
 
   useEffect(() => {
@@ -63,27 +48,6 @@ export default function LenderDashboard() {
       });
     }
   }, [loansCount, odometerValue]);
-
-  const activeAgents = stats?.active_count || 0;
-  const defaultedAgents = stats?.defaulted_count || 0;
-  const starterLimitAgents = stats?.starter_limit_count || 0;
-  
-  const totalCapitalOut = toNumber(stats?.total_capital_out);
-  const platformCap = toNumber(lenderProfile?.total_platform_exposure_cap);
-
-  const totalSegments = 10;
-  const activeSegments = platformCap > 0 ? Math.min(
-    totalSegments,
-    Math.round((totalCapitalOut / platformCap) * totalSegments)
-  ) : 0;
-
-  const filteredEvents = React.useMemo(() => {
-    if (!activeFilter) return events;
-    if (activeFilter === "defaulted") return events.filter(e => e.event_type.includes("defaulted"));
-    if (activeFilter === "active") return events.filter(e => e.event_type === "loan_approved");
-    // For starter, just an example since we don't have full agent status in events
-    return events;
-  }, [events, activeFilter]);
 
   return (
     <div className="flex-1 bg-editorial-grid py-10 px-6 font-mono text-text-primary">
@@ -107,58 +71,9 @@ export default function LenderDashboard() {
               </span>
             </div>
           </div>
-          <LiveActivityFeed events={filteredEvents} />
+          <LiveActivityFeed events={events} />
         </div>
         <div className="lg:col-span-4 space-y-6">
-          <button 
-            onClick={() => setIsDrawerOpen(true)}
-            className="w-full text-left transition-transform hover:-translate-y-1"
-          >
-            <Card role="lender" className="space-y-6 hover:shadow-[8px_8px_0px_rgba(27,23,34,1)] transition-shadow">
-              <h3 className="font-mono text-sm font-bold uppercase tracking-wider text-text-primary border-b border-text-secondary/15 pb-2">
-                Exposure
-              </h3>
-              <div className="grid grid-cols-2 gap-4 font-mono">
-                <div>
-                  <span className="block text-[10px] text-text-secondary uppercase">Capital Out</span>
-                  <span className="text-lg font-bold text-text-primary">${formatCurrency(totalCapitalOut)}</span>
-                </div>
-                <div>
-                  <span className="block text-[10px] text-text-secondary uppercase">Exposure Cap</span>
-                  <span className="text-lg font-bold text-text-secondary">${formatCurrency(platformCap)}</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <span className="block font-mono text-[9px] text-text-secondary/70 uppercase">Cap Allocation</span>
-                <div className="flex gap-1.5 justify-between">
-                  {Array.from({ length: totalSegments }).map((_, i) => (
-                      <span
-                        key={i}
-                        className={`h-5 w-3 rounded-none transition-all duration-300 ${
-                          i < activeSegments 
-                            ? (platformCap > 0 && (totalCapitalOut / platformCap) > 0.8 ? "bg-danger" : "bg-text-primary") 
-                            : "border border-text-primary bg-transparent"
-                        }`}
-                      />
-                  ))}
-                </div>
-              </div>
-              <div className="border-t border-text-secondary/10 pt-4 grid grid-cols-3 gap-2 font-mono text-center text-xs">
-                <div className="border-r border-text-secondary/10">
-                  <span className="block text-[9px] text-text-secondary uppercase">Active</span>
-                  <span className="font-bold text-base">{activeAgents}</span>
-                </div>
-                <div className="border-r border-text-secondary/10">
-                  <span className="block text-[9px] text-text-secondary uppercase">Starter</span>
-                  <span className="font-bold text-text-secondary">{starterLimitAgents}</span>
-                </div>
-                <div>
-                  <span className="block text-[9px] text-text-secondary uppercase">Defaulted</span>
-                  <span className="font-bold text-[var(--status-red)]">{defaultedAgents}</span>
-                </div>
-              </div>
-            </Card>
-          </button>
           {/* Insurance Pool */}
           <Card role="none" className="space-y-3 border border-accent/30">
             <h3 className="font-mono text-xs uppercase tracking-widest text-accent font-bold border-b border-accent/10 pb-2">
@@ -206,13 +121,6 @@ export default function LenderDashboard() {
           </Card>
         </div>
       </div>
-      <ExposureDetailDrawer
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        stats={{ activeAgents, defaultedAgents, starterLimitAgents, totalCapitalOut, platformCap }}
-        activeFilter={activeFilter}
-        onFilterChange={setActiveFilter}
-      />
     </div>
   );
 }

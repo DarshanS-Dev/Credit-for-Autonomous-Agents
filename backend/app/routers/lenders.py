@@ -15,8 +15,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Agent, Loan, LoanStatus, AgentStatus, InsurancePool
-from app.schemas import LenderPolicyUpdate, LenderOut, ExposureStats, AgentRosterItem, InsurancePoolOut
+from app.models import Agent, Loan, LoanStatus, AgentStatus, InsurancePool, Lender
+from app.schemas import LenderPolicyUpdate, LenderOut, ExposureStats, AgentRosterItem, InsurancePoolOut, LenderDirectoryEntry
 from app.dependencies import get_current_lender
 from app.services import policy_engine
 from app.services.underwriting_service import COLD_START_LIMIT
@@ -112,6 +112,9 @@ def agent_directory(
         ))
     return rows
 
+@router.get("/directory", response_model=list[LenderDirectoryEntry])
+def lender_directory(db: Session = Depends(get_db)):
+    return db.query(Lender).all()
 
 @router.get("/insurance-pool", response_model=InsurancePoolOut)
 def get_insurance_pool(db: Session = Depends(get_db)):

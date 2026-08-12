@@ -309,6 +309,20 @@ class InsurancePoolOut(BaseModel):
     balance: Decimal
     updated_at: datetime
 
+# ---------- Lender Directory ----------
+# Covers: discovery endpoint so an agent/frontend can browse lenders and
+# their policy terms BEFORE requesting a loan. Deliberately a narrower
+# view than LenderOut — exposes only what's needed to decide where to
+# apply, not internal fields like email.
+
+class LenderDirectoryEntry(ORMBase):
+    id: int
+    name: str
+    min_score_required: Decimal
+    max_exposure_per_agent: Decimal
+    total_platform_exposure_cap: Decimal
+    allowed_agent_categories: list[str]
+
 
 # ---------- Operator Console ----------
 

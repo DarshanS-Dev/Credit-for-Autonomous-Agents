@@ -82,8 +82,8 @@ export default function UploadCVPage() {
   return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 relative overflow-hidden">
       {/* Background Ornaments */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[50%] bg-blue-500/10 rounded-full blur-[120px]" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[50%] bg-purple-500/10 rounded-full blur-[120px]" />
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[50%] bg-base/10 rounded-full blur-[120px]" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[50%] bg-accent/10 rounded-full blur-[120px]" />
 
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -100,7 +100,7 @@ export default function UploadCVPage() {
           </p>
         </div>
 
-        <div className="bg-white/40 dark:bg-[#1A1A1A]/60 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-3xl p-8 shadow-[0_8px_32px_0_rgba(0,0,0,0.05)]">
+        <div className="bg-cream/40 dark:bg-navy/60 backdrop-blur-xl border border-text-primary/10 rounded-3xl p-8 shadow-[0_8px_32px_0_rgba(0,0,0,0.05)]">
           <form onSubmit={handleUpload} className="space-y-8">
             
             {/* Agent Selection */}
@@ -110,7 +110,7 @@ export default function UploadCVPage() {
               </label>
               <div className="relative">
                 {isLoadingAgents ? (
-                  <div className="w-full bg-black/5 dark:bg-white/5 rounded-xl p-4 text-sm text-text-secondary animate-pulse">
+                  <div className="w-full bg-surface/50 rounded-xl p-4 text-sm text-text-secondary animate-pulse">
                     Loading your agents...
                   </div>
                 ) : (
@@ -121,7 +121,7 @@ export default function UploadCVPage() {
                       setSelectedAgentId(e.target.value);
                       setMessage(null);
                     }}
-                    className="w-full appearance-none bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-4 pr-10 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all cursor-pointer"
+                    className="w-full appearance-none bg-surface/30 border border-text-primary/10 rounded-xl p-4 pr-10 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-base/50 transition-all cursor-pointer"
                   >
                     <option value="" disabled>Choose an agent...</option>
                     {agents.map((agent) => (
@@ -147,7 +147,7 @@ export default function UploadCVPage() {
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
                 className={`relative group flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-2xl cursor-pointer transition-all duration-300 ${
-                  file ? 'border-blue-500 bg-blue-500/5' : 'border-black/10 dark:border-white/10 hover:border-blue-400 hover:bg-blue-400/5'
+                  file ? 'border-base bg-base/5' : 'border-text-primary/20 hover:border-base hover:bg-base/5'
                 }`}
               >
                 <input
@@ -168,7 +168,7 @@ export default function UploadCVPage() {
                       exit={{ scale: 0.9, opacity: 0 }}
                       className="flex flex-col items-center text-center p-4"
                     >
-                      <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 mb-3">
+                      <div className="w-12 h-12 rounded-full bg-base/10 flex items-center justify-center text-base mb-3">
                         <Icon name="file-text" size={24} />
                       </div>
                       <p className="text-sm font-medium text-text-primary truncate max-w-[200px]">
@@ -177,7 +177,7 @@ export default function UploadCVPage() {
                       <p className="text-xs text-text-secondary mt-1">
                         {(file.size / 1024).toFixed(1)} KB
                       </p>
-                      <p className="text-xs text-blue-500 mt-3 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                      <p className="text-xs text-base mt-3 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
                         Click or drag to replace
                       </p>
                     </motion.div>
@@ -189,7 +189,7 @@ export default function UploadCVPage() {
                       exit={{ scale: 0.9, opacity: 0 }}
                       className="flex flex-col items-center text-center p-4"
                     >
-                      <div className="w-12 h-12 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center text-text-secondary group-hover:scale-110 transition-transform duration-300 mb-3">
+                      <div className="w-12 h-12 rounded-full bg-surface/50 flex items-center justify-center text-text-secondary group-hover:scale-110 transition-transform duration-300 mb-3">
                         <Icon name="upload-cloud" size={24} />
                       </div>
                       <p className="text-sm font-medium text-text-primary">
@@ -213,8 +213,8 @@ export default function UploadCVPage() {
                   exit={{ opacity: 0, y: -10, height: 0 }}
                   className={`p-4 rounded-xl text-sm font-medium flex items-center gap-2 ${
                     message.type === "success" 
-                      ? "bg-green-500/10 text-green-700 dark:text-green-400" 
-                      : "bg-red-500/10 text-red-700 dark:text-red-400"
+                      ? "bg-status-green/10 text-status-green" 
+                      : "bg-status-red/10 text-status-red"
                   }`}
                 >
                   <Icon name={message.type === 'success' ? 'check-circle' : 'alert-circle'} size={18} />
@@ -227,7 +227,7 @@ export default function UploadCVPage() {
             <button
               type="submit"
               disabled={isUploading || !file || !selectedAgentId}
-              className="w-full relative overflow-hidden group bg-text-primary text-[#F5F5F0] dark:bg-white dark:text-black font-semibold rounded-xl p-4 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0"
+              className="w-full relative overflow-hidden group bg-text-primary text-cream dark:bg-cream dark:text-navy font-semibold rounded-xl p-4 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0"
             >
               <span className="relative z-10 flex items-center justify-center gap-2">
                 {isUploading ? (
@@ -243,7 +243,7 @@ export default function UploadCVPage() {
                 )}
               </span>
               {!isUploading && !(!file || !selectedAgentId) && (
-                <div className="absolute inset-0 h-full w-full bg-white/20 dark:bg-black/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
+                <div className="absolute inset-0 h-full w-full bg-base/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
               )}
             </button>
 

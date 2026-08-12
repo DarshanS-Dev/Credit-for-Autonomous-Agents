@@ -1,5 +1,5 @@
 .card-nav-container {
-  position: sticky;
+  position: relative;
   top: 0;
   width: 100%;
   max-width: 64rem;

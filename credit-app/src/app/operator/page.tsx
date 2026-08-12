@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Doodle } from "@/components/ui/Doodle";
 import { Modal } from "@/components/ui/Modal";
+import { StickyNote } from "@/components/ui/StickyNote";
 import { motion } from "framer-motion";
 
 export default function OperatorConsole() {
@@ -81,6 +82,10 @@ export default function OperatorConsole() {
   };
 
   const selectableAgents = activeAgents.filter((a) => a.status.toLowerCase() !== "revoked");
+  
+  const affectedLoansCount = selectedAgentId 
+    ? events.filter(e => e.agent_id === parseInt(selectedAgentId, 10) && e.event_type === "loan_approved").length
+    : 0;
 
   return (
     <div className="flex-1 bg-editorial-grid py-10 px-6 font-mono text-text-primary">
@@ -156,17 +161,6 @@ export default function OperatorConsole() {
                     <Icon name="chevron-right" size={16} />
                   )}
                 </Button>
-
-                {/* 4. Live model decider */}
-                <Button 
-                  variant="ghost" 
-                  className="w-full flex items-center justify-between py-4 border border-text-secondary/35 text-text-primary opacity-50 cursor-not-allowed"
-                  onClick={() => handleTrigger("llm")}
-                  disabled={true}
-                >
-                  <span>Misbehaving agent — live model call</span>
-                  <Icon name="lock" size={16} />
-                </Button>
               </div>
             </Card>
 
@@ -209,25 +203,25 @@ export default function OperatorConsole() {
           <div className="lg:col-span-8 space-y-6">
             
             {/* Exposure Status metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 border-2 border-text-primary bg-transparent text-text-primary font-mono">
+            <div className="flex flex-wrap md:grid md:grid-cols-3 gap-6">
+              <StickyNote rotationDeg={-1} bgColor="bg-[var(--primary-yellow)]">
                 <span className="block text-[9px] text-text-primary/70 uppercase">Active Agents</span>
                 <span className="text-xl font-bold flex items-center gap-1">
                   {stats?.active_count || 0} <Doodle type="motion" size={14} />
                 </span>
-              </div>
-              <div className="p-4 border-2 border-text-primary bg-transparent text-text-primary font-mono">
+              </StickyNote>
+              <StickyNote rotationDeg={1} bgColor="bg-[var(--cream)]">
                 <span className="block text-[9px] text-text-primary/70 uppercase">Total Defaulted</span>
-                <span className="text-xl font-bold text-danger">
+                <span className="text-xl font-bold text-[var(--status-red)]">
                   {stats?.defaulted_count || 0}
                 </span>
-              </div>
-              <div className="p-4 border-2 border-text-primary bg-transparent text-text-primary font-mono">
-                <span className="block text-[9px] text-text-primary/70 uppercase">Exposure Balance</span>
+              </StickyNote>
+              <StickyNote rotationDeg={-2} bgColor="bg-[var(--status-teal)]" className="text-white">
+                <span className="block text-[9px] text-white/70 uppercase">Exposure Balance</span>
                 <span className="text-xl font-bold flex items-center gap-1">
                   ${(stats?.total_capital_out || 0).toLocaleString()} <Doodle type="sparkle" size={14} />
                 </span>
-              </div>
+              </StickyNote>
             </div>
 
             {/* Live outcome events stream list */}
@@ -245,9 +239,10 @@ export default function OperatorConsole() {
                     className="p-3 border-b border-text-primary/10 flex items-center justify-between font-mono text-xs bg-transparent"
                   >
                     <div className="flex items-center gap-3">
-                      <span className={`h-2 w-2 rounded-none ${
-                        item.event_type === "loan_approved" ? "bg-text-primary" : 
-                        item.event_type.includes("defaulted") || item.event_type.includes("revoked") ? "bg-danger" : "bg-text-secondary"
+                      <span className={`h-2.5 w-2.5 rounded-full ${
+                        item.event_type === "loan_approved" ? "bg-[var(--status-teal)] animate-pulse" : 
+                        item.event_type.includes("defaulted") || item.event_type.includes("revoked") ? "bg-[var(--status-red)]" : 
+                        item.event_type.includes("anomaly") ? "bg-[var(--primary-yellow)]" : "bg-text-secondary"
                       }`} />
                       <span className="text-text-primary border border-text-primary px-1">{item.event_type} - {item.detail}</span>
                     </div>
@@ -292,12 +287,20 @@ export default function OperatorConsole() {
         isOpen={isKillModalOpen}
         onClose={() => setIsKillModalOpen(false)}
         title="Fire Credential Kill Switch?"
-        description="Revoke this agent's credential now? This bypasses the scripted flow and cannot be undone."
+        description={`Revoke this agent's credential now? This bypasses the scripted flow and cannot be undone.`}
         confirmLabel="Fire Kill Switch"
         cancelLabel="Cancel"
         onConfirm={handleKillSwitch}
         severity="danger"
-      />
+      >
+        <div className="p-4 bg-[var(--status-red)]/10 border-l-4 border-[var(--status-red)] text-text-primary font-mono text-sm mb-4">
+          <p className="font-bold text-[var(--status-red)] mb-1">Blast Radius:</p>
+          <p>This will permanently revoke Agent #{selectedAgentId}.</p>
+          {affectedLoansCount > 0 && (
+            <p className="mt-1 font-bold">This will affect {affectedLoansCount} known active loan(s).</p>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }

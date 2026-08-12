@@ -22,7 +22,7 @@ export default function AuthScreen() {
   const { setSession } = useSession();
 
   const roleParam = searchParams.get("role") as SessionRole | null;
-  const role = roleParam === "principal" || roleParam === "lender" ? roleParam : null;
+  const role = roleParam === "principal" || roleParam === "lender" || roleParam === "operator" ? roleParam : null;
 
   const [mode, setMode] = useState<AuthMode>("login");
   const [showPassword, setShowPassword] = useState(false);
@@ -69,27 +69,38 @@ export default function AuthScreen() {
 
     try {
       let tokenResponse;
-      if (mode === "signup") {
-        let publicKey: string | undefined;
-        if (role === "principal") {
-          const keypair = generatePrincipalKeypair();
-          publicKey = keypair.publicKeyB64;
-          tokenResponse = await signup({
-            role,
-            name,
-            email,
-            password,
-            public_key: publicKey,
-          });
-          savePrincipalKeypair(tokenResponse.id, {
-            privateKeyHex: keypair.privateKeyHex,
-            publicKeyHex: keypair.publicKeyHex,
-          });
-        } else {
-          tokenResponse = await signup({ role, name, email, password });
-        }
+      if (role === "operator") {
+        // Mock operator login since there's no backend model for operators
+        tokenResponse = {
+          access_token: "operator-demo-token",
+          role: "operator",
+          id: 0,
+        };
+        // Artificial delay for UX
+        await new Promise(r => setTimeout(r, 600));
       } else {
-        tokenResponse = await login({ role, email, password });
+        if (mode === "signup") {
+          let publicKey: string | undefined;
+          if (role === "principal") {
+            const keypair = generatePrincipalKeypair();
+            publicKey = keypair.publicKeyB64;
+            tokenResponse = await signup({
+              role,
+              name,
+              email,
+              password,
+              public_key: publicKey,
+            } as any); // using as any because role operator is in SessionRole
+            savePrincipalKeypair(tokenResponse.id, {
+              privateKeyHex: keypair.privateKeyHex,
+              publicKeyHex: keypair.publicKeyHex,
+            });
+          } else {
+            tokenResponse = await signup({ role, name, email, password } as any);
+          }
+        } else {
+          tokenResponse = await login({ role, email, password } as any);
+        }
       }
 
       setSession({
@@ -106,7 +117,11 @@ export default function AuthScreen() {
         duration: 0.25,
         ease: "power2.in",
         onComplete: () => {
-          router.push(role === "principal" ? "/principal/onboarding" : "/lender/onboarding");
+          if (role === "operator") {
+            router.push("/operator");
+          } else {
+            router.push(role === "principal" ? "/principal/onboarding" : "/lender/onboarding");
+          }
         },
       });
     } catch (err) {
@@ -122,7 +137,7 @@ export default function AuthScreen() {
   if (!role) return null;
 
   const isLogin = mode === "login";
-  const roleLabel = role === "principal" ? "Principal" : "Lender";
+  const roleLabel = role === "principal" ? "Principal" : role === "lender" ? "Lender" : "Operator";
 
   return (
     <div
@@ -144,7 +159,7 @@ export default function AuthScreen() {
       <div className="relative z-20 flex items-center justify-between px-6 md:px-12 py-6">
         <Link
           href="/login/role"
-          className="font-mono text-sm font-bold tracking-tight text-text-primary hover:text-base transition-colors"
+          className="font-mono text-sm font-bold tracking-tight text-text-primary hover:text-accent transition-colors"
         >
           CREDIT<span className="text-accent">*</span>
         </Link>
@@ -172,8 +187,8 @@ export default function AuthScreen() {
             <motion.div
               className="relative flex flex-col justify-center px-10 lg:px-14 py-12 border-r-2 border-text-primary overflow-hidden"
               animate={{
-                backgroundColor: isLogin ? "#FDF3C8" : "#017587",
-                color: isLogin ? "#1F242A" : "#F5F5F0",
+                backgroundColor: isLogin ? "#FDF3C8" : "#FFFFFF",
+                color: isLogin ? "#1F242A" : "#1F242A",
               }}
               transition={{ duration: 0.55, ease: [0.32, 0.72, 0, 1] }}
             >
@@ -215,8 +230,8 @@ export default function AuthScreen() {
             <motion.div
               className="relative flex flex-col justify-center px-10 lg:px-14 py-12 overflow-hidden"
               animate={{
-                backgroundColor: isLogin ? "#017587" : "#FDF3C8",
-                color: isLogin ? "#F5F5F0" : "#1F242A",
+                backgroundColor: isLogin ? "#FFFFFF" : "#FDF3C8",
+                color: isLogin ? "#1F242A" : "#1F242A",
               }}
               transition={{ duration: 0.55, ease: [0.32, 0.72, 0, 1] }}
             >
@@ -257,7 +272,7 @@ export default function AuthScreen() {
           </div>
 
           <div className="md:hidden flex flex-col min-h-[600px]">
-            <div className="flex-1 bg-base text-[#F5F5F0] px-6 py-10 flex flex-col justify-center">
+            <div className="flex-1 bg-white text-text-primary px-6 py-10 flex flex-col justify-center">
               <AuthFormContent
                 mode={mode}
                 roleLabel={roleLabel}
@@ -332,7 +347,7 @@ function AuthFormContent({
     <div className="w-full max-w-sm mx-auto">
       <p
         className={`font-mono text-[10px] uppercase tracking-[0.25em] font-bold mb-3 ${
-          dark ? "text-accent" : "text-base"
+          dark ? "text-accent" : "text-accent"
         }`}
       >
         {isLogin ? "Welcome back" : "Create account"} — {roleLabel}
@@ -384,7 +399,7 @@ function AuthFormContent({
               className={`p-1 transition-colors ${
                 dark
                   ? "text-[#F5F5F0]/50 hover:text-accent"
-                  : "text-text-secondary hover:text-base"
+                  : "text-text-secondary hover:text-accent"
               }`}
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
@@ -406,9 +421,10 @@ function AuthFormContent({
         )}
 
         {error && (
-          <p className="font-mono text-xs text-danger border border-danger/30 bg-danger/5 p-2">
-            {error}
-          </p>
+          <div className="flex items-center gap-3 border-2 border-danger bg-white px-4 py-3 shadow-[3px_3px_0px_rgba(139,67,67,1)]">
+            <Icon name="warning" size={18} className="shrink-0 text-danger" />
+            <p className="font-mono text-sm font-bold text-danger">{error}</p>
+          </div>
         )}
 
         <button
@@ -515,7 +531,7 @@ function AuthField({
           required={required}
           className={`w-full px-4 py-3.5 font-mono text-sm border-2 transition-all duration-150 outline-none ${
             dark
-              ? "bg-[#015f6e] border-[#F5F5F0]/20 text-[#F5F5F0] placeholder:text-[#F5F5F0]/30 focus:border-accent"
+              ? "bg-[#F0F0EA] border-[#1B1722]/20 text-text-primary placeholder:text-text-primary/40 focus:border-accent"
               : "bg-white border-text-primary/20 text-text-primary placeholder:text-text-secondary/40 focus:border-accent"
           }`}
         />

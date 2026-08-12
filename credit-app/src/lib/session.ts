@@ -1,7 +1,7 @@
 // credit-app/src/lib/session.ts
 "use client";
 
-export type SessionRole = "principal" | "lender";
+export type SessionRole = "principal" | "lender" | "operator";
 
 export interface Session {
   token: string;

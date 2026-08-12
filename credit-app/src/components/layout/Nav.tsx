@@ -14,9 +14,9 @@ export const Nav: React.FC = () => {
   const router = useRouter();
   const { session, isLoading, logout } = useSession();
 
-  const handleRoleSwitch = () => {
+  const handleLogout = () => {
     logout();
-    router.push("/login/role");
+    router.push("/");
   };
 
   // Pages where the nav should never render at all.
@@ -152,8 +152,8 @@ export const Nav: React.FC = () => {
         menuColor="#1B1722"
         buttonBgColor="#1B1722"
         buttonTextColor="#F5F5F0"
-        ctaText={effectiveRole === "operator" ? "Exit Console" : "Switch Role"}
-        onCtaClick={handleRoleSwitch}
+        ctaText={effectiveRole === "operator" ? "Exit Console" : "Logout"}
+        onCtaClick={handleLogout}
       />
     </div>
   );

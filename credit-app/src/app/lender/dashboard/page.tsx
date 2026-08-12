@@ -9,7 +9,8 @@ import { getOperatorEvents } from "@/lib/api/operator";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { Doodle } from "@/components/ui/Doodle";
-import { motion, AnimatePresence } from "framer-motion";
+import { LiveActivityFeed } from "@/components/lender/LiveActivityFeed";
+import { ExposureDetailDrawer } from "@/components/lender/ExposureDetailDrawer";
 import { gsap } from "gsap";
 import { toNumber, formatCurrency } from "@/lib/api/types";
 
@@ -44,6 +45,8 @@ export default function LenderDashboard() {
 
   const [odometerValue, setOdometerValue] = useState(0);
   const odometerRef = useRef<HTMLSpanElement>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
   
   const loansCount = events.filter(e => e.event_type === 'loan_approved').length;
 
@@ -74,6 +77,14 @@ export default function LenderDashboard() {
     Math.round((totalCapitalOut / platformCap) * totalSegments)
   ) : 0;
 
+  const filteredEvents = React.useMemo(() => {
+    if (!activeFilter) return events;
+    if (activeFilter === "defaulted") return events.filter(e => e.event_type.includes("defaulted"));
+    if (activeFilter === "active") return events.filter(e => e.event_type === "loan_approved");
+    // For starter, just an example since we don't have full agent status in events
+    return events;
+  }, [events, activeFilter]);
+
   return (
     <div className="flex-1 bg-editorial-grid py-10 px-6 font-mono text-text-primary">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -96,81 +107,58 @@ export default function LenderDashboard() {
               </span>
             </div>
           </div>
-          <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-            <AnimatePresence initial={false}>
-              {events.length === 0 ? (
-                <div className="text-center py-16 font-mono text-xs text-text-secondary">
-                  No activity yet.
-                </div>
-              ) : (
-                events.map((item) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.26 }}
-                    className="p-4 bg-surface border border-text-secondary/10 flex items-center justify-between font-mono text-xs"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={`h-2 w-2 rounded-full ${
-                        item.event_type === "loan_approved" ? "bg-text-primary animate-pulse" :
-                        item.event_type.includes("revoked") || item.event_type.includes("defaulted") ? "bg-danger" : "bg-text-secondary"
-                      }`} />
-                      <span className="text-text-primary border border-text-primary px-1">{item.event_type}</span>
-                    </div>
-                    <span className="text-[10px] text-text-secondary/60">{new Date(item.created_at).toLocaleString()}</span>
-                  </motion.div>
-                ))
-              )}
-            </AnimatePresence>
-          </div>
+          <LiveActivityFeed events={filteredEvents} />
         </div>
         <div className="lg:col-span-4 space-y-6">
-          <Card role="lender" className="space-y-6">
-            <h3 className="font-mono text-sm font-bold uppercase tracking-wider text-text-primary border-b border-text-secondary/15 pb-2">
-              Exposure
-            </h3>
-            <div className="grid grid-cols-2 gap-4 font-mono">
-              <div>
-                <span className="block text-[10px] text-text-secondary uppercase">Capital Out</span>
-                <span className="text-lg font-bold text-text-primary">${formatCurrency(totalCapitalOut)}</span>
+          <button 
+            onClick={() => setIsDrawerOpen(true)}
+            className="w-full text-left transition-transform hover:-translate-y-1"
+          >
+            <Card role="lender" className="space-y-6 hover:shadow-[8px_8px_0px_rgba(27,23,34,1)] transition-shadow">
+              <h3 className="font-mono text-sm font-bold uppercase tracking-wider text-text-primary border-b border-text-secondary/15 pb-2">
+                Exposure
+              </h3>
+              <div className="grid grid-cols-2 gap-4 font-mono">
+                <div>
+                  <span className="block text-[10px] text-text-secondary uppercase">Capital Out</span>
+                  <span className="text-lg font-bold text-text-primary">${formatCurrency(totalCapitalOut)}</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] text-text-secondary uppercase">Exposure Cap</span>
+                  <span className="text-lg font-bold text-text-secondary">${formatCurrency(platformCap)}</span>
+                </div>
               </div>
-              <div>
-                <span className="block text-[10px] text-text-secondary uppercase">Exposure Cap</span>
-                <span className="text-lg font-bold text-text-secondary">${formatCurrency(platformCap)}</span>
+              <div className="space-y-2">
+                <span className="block font-mono text-[9px] text-text-secondary/70 uppercase">Cap Allocation</span>
+                <div className="flex gap-1.5 justify-between">
+                  {Array.from({ length: totalSegments }).map((_, i) => (
+                      <span
+                        key={i}
+                        className={`h-5 w-3 rounded-none transition-all duration-300 ${
+                          i < activeSegments 
+                            ? (platformCap > 0 && (totalCapitalOut / platformCap) > 0.8 ? "bg-danger" : "bg-text-primary") 
+                            : "border border-text-primary bg-transparent"
+                        }`}
+                      />
+                  ))}
+                </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <span className="block font-mono text-[9px] text-text-secondary/70 uppercase">Cap Allocation</span>
-              <div className="flex gap-1.5 justify-between">
-                {Array.from({ length: totalSegments }).map((_, i) => (
-                    <span
-                      key={i}
-                      className={`h-5 w-3 rounded-none transition-all duration-300 ${
-                        i < activeSegments 
-                          ? (platformCap > 0 && (totalCapitalOut / platformCap) > 0.8 ? "bg-danger" : "bg-text-primary") 
-                          : "border border-text-primary bg-transparent"
-                      }`}
-                    />
-                ))}
+              <div className="border-t border-text-secondary/10 pt-4 grid grid-cols-3 gap-2 font-mono text-center text-xs">
+                <div className="border-r border-text-secondary/10">
+                  <span className="block text-[9px] text-text-secondary uppercase">Active</span>
+                  <span className="font-bold text-base">{activeAgents}</span>
+                </div>
+                <div className="border-r border-text-secondary/10">
+                  <span className="block text-[9px] text-text-secondary uppercase">Starter</span>
+                  <span className="font-bold text-text-secondary">{starterLimitAgents}</span>
+                </div>
+                <div>
+                  <span className="block text-[9px] text-text-secondary uppercase">Defaulted</span>
+                  <span className="font-bold text-[var(--status-red)]">{defaultedAgents}</span>
+                </div>
               </div>
-            </div>
-            <div className="border-t border-text-secondary/10 pt-4 grid grid-cols-3 gap-2 font-mono text-center text-xs">
-              <div className="border-r border-text-secondary/10">
-                <span className="block text-[9px] text-text-secondary uppercase">Active</span>
-                <span className="font-bold text-base">{activeAgents}</span>
-              </div>
-              <div className="border-r border-text-secondary/10">
-                <span className="block text-[9px] text-text-secondary uppercase">Starter</span>
-                <span className="font-bold text-text-secondary">{starterLimitAgents}</span>
-              </div>
-              <div>
-                <span className="block text-[9px] text-text-secondary uppercase">Defaulted</span>
-                <span className="font-bold text-danger">{defaultedAgents}</span>
-              </div>
-            </div>
-          </Card>
+            </Card>
+          </button>
           {/* Insurance Pool */}
           <Card role="none" className="space-y-3 border border-accent/30">
             <h3 className="font-mono text-xs uppercase tracking-widest text-accent font-bold border-b border-accent/10 pb-2">
@@ -218,6 +206,13 @@ export default function LenderDashboard() {
           </Card>
         </div>
       </div>
+      <ExposureDetailDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        stats={{ activeAgents, defaultedAgents, starterLimitAgents, totalCapitalOut, platformCap }}
+        activeFilter={activeFilter}
+        onFilterChange={setActiveFilter}
+      />
     </div>
   );
 }

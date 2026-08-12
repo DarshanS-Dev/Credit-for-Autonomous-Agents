@@ -21,4 +21,3 @@ backend/alembic/versions/__pycache__/
 *.log
 
 docs
-backend

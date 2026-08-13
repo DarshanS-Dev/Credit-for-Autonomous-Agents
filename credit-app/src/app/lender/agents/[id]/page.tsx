@@ -79,9 +79,15 @@ export default function LenderAgentDetail() {
   });
 
   const [inflowAmount, setInflowAmount] = useState(100);
+  const [agentApiKey, setAgentApiKey] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.localStorage.getItem(`credit-agents:agent-key:${agentId}`) || "";
+    }
+    return "";
+  });
 
   const inflowMutation = useMutation({
-    mutationFn: () => recordInflow(agentId, inflowAmount),
+    mutationFn: () => recordInflow(agentId, inflowAmount, session?.token, agentApiKey || undefined),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agent-wallet', agentId] });
       queryClient.invalidateQueries({ queryKey: ['agent-transactions', agentId] });
@@ -90,7 +96,7 @@ export default function LenderAgentDetail() {
   });
 
   const taskFailureMutation = useMutation({
-    mutationFn: () => declareTaskFailure(agentId),
+    mutationFn: () => declareTaskFailure(agentId, session?.token, agentApiKey || undefined),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agent-lender-view', agentId] });
       queryClient.invalidateQueries({ queryKey: ['agent-wallet', agentId] });
@@ -260,6 +266,16 @@ export default function LenderAgentDetail() {
                     Simulate Events
                   </h3>
                   <div className="space-y-3 font-mono text-xs">
+                    <div>
+                      <label className="block text-text-secondary uppercase mb-2">Agent API Key (Required for Simulation)</label>
+                      <input
+                        type="text"
+                        value={agentApiKey}
+                        onChange={(e) => setAgentApiKey(e.target.value)}
+                        placeholder="sk_..."
+                        className="w-full px-3 py-2 bg-transparent border border-text-secondary/35 text-text-primary font-mono text-sm mb-4"
+                      />
+                    </div>
                     <div>
                       <label className="block text-text-secondary uppercase mb-2">Task payout inflow amount</label>
                       <div className="flex gap-3">

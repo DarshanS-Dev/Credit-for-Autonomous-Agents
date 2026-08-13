@@ -28,6 +28,8 @@ interface RequestOptions {
   token?: string;
   /** Skip attaching Authorization header entirely (signup/login). */
   skipAuth?: boolean;
+  /** Explicit X-Agent-Key override. */
+  agentKey?: string;
 }
 
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -42,7 +44,9 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     if (bearer) headers["Authorization"] = `Bearer ${bearer}`;
   }
 
-  if (typeof window !== "undefined" && method === "POST") {
+  if (options.agentKey) {
+    headers["X-Agent-Key"] = options.agentKey;
+  } else if (typeof window !== "undefined" && method === "POST") {
     let matchedAgentId: string | null = null;
     if (path.startsWith("/loans/")) {
       const parts = path.split("/");
@@ -70,11 +74,14 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
-  const isJson = res.headers.get("content-type")?.includes("application/json");
-  const payload = isJson ? await res.json().catch(() => null) : null;
+  const payload = await res.json().catch(() => null);
 
   if (!res.ok) {
     throw new ApiError(res.status, payload);
+  }
+
+  if (payload === null) {
+    throw new ApiError(res.status, "Response body missing or unparseable despite success status");
   }
 
   return payload as T;

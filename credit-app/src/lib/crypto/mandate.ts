@@ -95,12 +95,13 @@ export function canonicalizeMandate(
  * as closely as JS timestamp precision allows (milliseconds, padded to
  * Python's 6-digit microsecond field) — e.g. "2026-08-02T04:39:22.308000+00:00".
  *
- * NOTE: see the top-of-response callout. The backend currently generates
- * its OWN issued_at server-side at verify time rather than accepting this
- * client-generated one, so no matter how precisely this is formatted, the
- * signed payload here and the payload the server re-verifies against will
- * not match until DelegationMandateSign accepts + reuses an issued_at
- * field. This function is written to the correct contract regardless.
+ * NOTE: the client-generated issued_at IS passed to and used by the backend.
+ * `DelegationMandateSign.issued_at` (schemas.py) is accepted from the POST
+ * body, passed directly into `verify_mandate()` (agents.py:121), and fed into
+ * `canonicalize_mandate()` (credential_service.py:70) — so the byte string
+ * the server re-verifies against is built from this exact value.
+ * This function formats the timestamp to match Python's
+ * `datetime.astimezone(timezone.utc).isoformat()` output precisely.
  */
 export function buildIssuedAtIso(date: Date = new Date()): string {
   const iso = date.toISOString(); // "2026-08-02T04:39:22.308Z"

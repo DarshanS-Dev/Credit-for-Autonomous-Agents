@@ -21,6 +21,7 @@ export default function AddNewAgent() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
+  const [createdAgent, setCreatedAgent] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
@@ -30,10 +31,11 @@ export default function AddNewAgent() {
       const keypair = loadPrincipalKeypair(session.id);
       if (!keypair) throw new Error("No signing key — log out and sign up again");
       const signed = signMandate(keypair.privateKeyHex, session.id, agent.id, DEFAULT_MANDATE_BOUNDS);
-      await signAgentMandate(agent.id, signed.bounds, signed.signatureB64, signed.issuedAtIso);
-      return agent;
+      const res = await signAgentMandate(agent.id, signed.bounds, signed.signatureB64, signed.issuedAtIso);
+      return res; // returns AgentMandateOut which contains api_key
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      setCreatedAgent(data);
       setIsCompleted(true);
       setError(null);
     },
@@ -87,7 +89,21 @@ export default function AddNewAgent() {
             ) : (
               <motion.div key="done" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-12 text-center space-y-6">
                 <Icon name="key" size={32} className="mx-auto text-text-primary" />
-                <p className="font-mono text-sm">Agent registered. Delegation credential issued.</p>
+                <p className="font-mono text-sm font-bold text-emerald-600 uppercase">Agent registered successfully!</p>
+                
+                <div className="bg-text-primary/5 p-4 border text-left font-mono text-xs space-y-2">
+                  <p><strong>Agent ID:</strong> {createdAgent?.id}</p>
+                  {createdAgent?.api_key && (
+                    <>
+                      <p className="break-all"><strong>API Key (X-Agent-Key):</strong> <code>{createdAgent.api_key}</code></p>
+                      <p className="text-[10px] text-text-secondary">⚠️ Save this key now. It will not be shown again.</p>
+                      <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(createdAgent.api_key)}>
+                        Copy Key
+                      </Button>
+                    </>
+                  )}
+                </div>
+
                 <Button variant="primary" className="w-full" onClick={() => router.push("/principal/dashboard")}>
                   Back to dashboard
                 </Button>

@@ -16,18 +16,24 @@ export function createAgent(name: string, description?: string): Promise<AgentOu
   });
 }
 
-export function signAgentMandate(
+export async function signAgentMandate(
   agentId: number,
   bounds: string,
   signature: string,
   issuedAt: string
 ): Promise<AgentOut> {
-  return api.post<AgentOut>(`/agents/${agentId}/mandate`, {
+  const result = await api.post<any>(`/agents/${agentId}/mandate`, {
     agent_id: agentId,
     bounds,
     issued_at: issuedAt,
     signature,
   });
+  if (result && result.api_key) {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(`credit-agents:agent-key:${agentId}`, result.api_key);
+    }
+  }
+  return result;
 }
 
 export function listMyAgents(): Promise<AgentRosterItem[]> {

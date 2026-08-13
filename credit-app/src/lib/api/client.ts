@@ -42,6 +42,28 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     if (bearer) headers["Authorization"] = `Bearer ${bearer}`;
   }
 
+  if (typeof window !== "undefined" && method === "POST") {
+    let matchedAgentId: string | null = null;
+    if (path.startsWith("/loans/")) {
+      const parts = path.split("/");
+      if (parts.length === 3 && /^\d+$/.test(parts[2])) {
+        matchedAgentId = parts[2];
+      }
+    } else if (path.startsWith("/repayment/")) {
+      const parts = path.split("/");
+      const last = parts[parts.length - 1];
+      if (/^\d+$/.test(last)) {
+        matchedAgentId = last;
+      }
+    }
+    if (matchedAgentId) {
+      const agentKey = window.localStorage.getItem(`credit-agents:agent-key:${matchedAgentId}`);
+      if (agentKey) {
+        headers["X-Agent-Key"] = agentKey;
+      }
+    }
+  }
+
   const res = await fetch(`/api${path}`, {
     method,
     headers,

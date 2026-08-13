@@ -46,7 +46,7 @@ export const Nav: React.FC = () => {
           links: [
             { label: "Dashboard", href: "/principal/dashboard" },
             { label: "Register Agent", href: "/principal/agents/add" },
-            { label: "Upload CV", href: "/principal/upload-cv" },
+            { label: "Upload History", href: "/principal/upload-cv" },
           ],
         },
         {

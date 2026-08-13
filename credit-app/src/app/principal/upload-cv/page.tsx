@@ -57,7 +57,7 @@ export default function UploadCVPage() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch(`/api/agents/${selectedAgentId}/cv`, {
+      const res = await fetch(`/api/agents/${selectedAgentId}/upload-history`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${session?.token}`,
@@ -66,10 +66,11 @@ export default function UploadCVPage() {
       });
 
       if (!res.ok) {
-        throw new Error("Failed to upload CV");
+        const errPayload = await res.json().catch(() => null);
+        throw new Error(errPayload?.detail || "Failed to upload task history");
       }
 
-      setMessage({ type: "success", text: "CV uploaded successfully!" });
+      setMessage({ type: "success", text: "Task history uploaded successfully!" });
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err: any) {
@@ -93,10 +94,10 @@ export default function UploadCVPage() {
       >
         <div className="text-center mb-10">
           <h1 className="text-4xl font-extrabold tracking-tight text-text-primary mb-3">
-            Upload Agent Resume
+            Upload Agent Task History
           </h1>
           <p className="text-text-secondary text-sm">
-            Securely upload historical background and CVs for your agents.
+            Upload a structured CSV of pre-platform task history to compute their underwriting score.
           </p>
         </div>
 
@@ -154,7 +155,7 @@ export default function UploadCVPage() {
                   type="file"
                   id="cv-upload"
                   ref={fileInputRef}
-                  accept=".pdf,.doc,.docx"
+                  accept=".csv"
                   onChange={handleFileChange}
                   className="hidden"
                 />
@@ -193,10 +194,10 @@ export default function UploadCVPage() {
                         <Icon name="upload-cloud" size={24} />
                       </div>
                       <p className="text-sm font-medium text-text-primary">
-                        Click to upload or drag & drop
+                        Click to upload or drag & drop CSV
                       </p>
                       <p className="text-xs text-text-secondary mt-1">
-                        PDF, DOCX up to 10MB
+                        CSV task history file up to 10MB
                       </p>
                     </motion.div>
                   )}

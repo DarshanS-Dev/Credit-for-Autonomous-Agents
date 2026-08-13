@@ -74,11 +74,14 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
-  const isJson = res.headers.get("content-type")?.includes("application/json");
-  const payload = isJson ? await res.json().catch(() => null) : null;
+  const payload = await res.json().catch(() => null);
 
   if (!res.ok) {
     throw new ApiError(res.status, payload);
+  }
+
+  if (payload === null) {
+    throw new ApiError(res.status, "Response body missing or unparseable despite success status");
   }
 
   return payload as T;

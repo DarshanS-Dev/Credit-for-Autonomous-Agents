@@ -15,6 +15,14 @@ const config: Config = {
         "text-secondary": "#5B6064",
         accent: "#F0B419",
         danger: "#8B4343",
+        // New Theme Variables
+        "primary-yellow": "var(--primary-yellow)",
+        cream: "var(--cream)",
+        navy: "var(--navy)",
+        maroon: "var(--maroon)",
+        "status-green": "var(--status-green)",
+        "status-red": "var(--status-red)",
+        "status-teal": "var(--status-teal)",
       },
       fontFamily: {
         mono: ["IBM Plex Mono", "monospace"],

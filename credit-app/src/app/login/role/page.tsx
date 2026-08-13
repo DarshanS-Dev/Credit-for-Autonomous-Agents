@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { gsap } from "gsap";
@@ -8,17 +8,74 @@ import { motion } from "framer-motion";
 import { Icon } from "@/components/ui/Icon";
 import type { SessionRole } from "@/lib/session";
 
+type RoleOption = SessionRole | "operator";
+
+const roleCards: Array<{
+  key: RoleOption;
+  label: string;
+  title: string;
+  description: string;
+  icon: "key" | "policy" | "terminal";
+  accent: string;
+  tint: string;
+  buttonClass: string;
+  textClass: string;
+  route: string;
+}> = [
+  {
+    key: "principal",
+    label: "Principal",
+    title: "Manage Agents",
+    description: "Register autonomous agents, issue delegation credentials, and configure bounds of mandate.",
+    icon: "key",
+    accent: "text-base",
+    tint: "bg-[#F5F5F0]",
+    buttonClass: "bg-text-primary text-[#F5F5F0]",
+    textClass: "text-text-primary",
+    route: "/login?role=principal",
+  },
+  {
+    key: "lender",
+    label: "Lender",
+    title: "Set Policy",
+    description: "Define risk thresholds, monitor auto-approved loans, and detect anomalies in real time.",
+    icon: "policy",
+    accent: "text-accent",
+    tint: "bg-[#FDF3C8]",
+    buttonClass: "bg-white text-text-primary",
+    textClass: "text-text-primary",
+    route: "/login?role=lender",
+  },
+  {
+    key: "operator",
+    label: "Operator",
+    title: "Run Console",
+    description: "Jump straight into the live demo console with self-bootstrapped tokens and no login step.",
+    icon: "terminal",
+    accent: "text-[#017587]",
+    tint: "bg-[#EAF7F8]",
+    buttonClass: "bg-[#017587] text-[#F5F5F0]",
+    textClass: "text-text-primary",
+    route: "/login?role=operator",
+  },
+];
+
 export default function RoleSelectionPage() {
   const router = useRouter();
-  const [selectedRole, setSelectedRole] = useState<SessionRole | null>(null);
+  const [selectedRole, setSelectedRole] = useState<RoleOption | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const leftPanelRef = useRef<HTMLDivElement>(null);
-  const rightPanelRef = useRef<HTMLDivElement>(null);
-  const leftInnerRef = useRef<HTMLDivElement>(null);
-  const rightInnerRef = useRef<HTMLDivElement>(null);
-  const dividerRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
+  const panelRefs = useRef<Record<RoleOption, HTMLDivElement | null>>({
+    principal: null,
+    lender: null,
+    operator: null,
+  });
+  const innerRefs = useRef<Record<RoleOption, HTMLDivElement | null>>({
+    principal: null,
+    lender: null,
+    operator: null,
+  });
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -28,20 +85,15 @@ export default function RoleSelectionPage() {
         { scaleX: 0.5, duration: 0.8, ease: "power3.out", transformOrigin: "left center" }
       );
       gsap.fromTo(
-        [leftInnerRef.current, rightInnerRef.current],
-        { y: 40, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.7, stagger: 0.12, ease: "power4.out", delay: 0.15 }
-      );
-      gsap.fromTo(
-        dividerRef.current,
-        { scale: 0.8, opacity: 0, rotation: -4 },
-        { scale: 1, opacity: 1, rotation: 2, duration: 0.6, ease: "back.out(1.4)", delay: 0.4 }
+        [innerRefs.current.principal, innerRefs.current.lender, innerRefs.current.operator],
+        { y: 36, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.7, stagger: 0.1, ease: "power4.out", delay: 0.15 }
       );
     }, containerRef);
     return () => ctx.revert();
   }, []);
 
-  const handleSelectRole = (role: SessionRole) => {
+  const handleSelectRole = (role: RoleOption) => {
     if (selectedRole) return;
     setSelectedRole(role);
 
@@ -49,28 +101,19 @@ export default function RoleSelectionPage() {
       onComplete: () => router.push(`/login?role=${role}`),
     });
 
-    if (dividerRef.current) {
-      tl.to(dividerRef.current, { opacity: 0, scale: 0.8, duration: 0.15, ease: "power2.out" }, 0);
-    }
+    const panels = [panelRefs.current.principal, panelRefs.current.lender, panelRefs.current.operator];
+    const selectedPanel = panelRefs.current[role];
 
-    if (role === "principal") {
-      tl.to(leftPanelRef.current, { width: "100vw", duration: 0.65, ease: "power2.inOut" }, 0);
-      tl.to(
-        rightPanelRef.current,
-        { width: "0vw", paddingLeft: 0, paddingRight: 0, duration: 0.65, ease: "power2.inOut" },
-        0
-      );
-      tl.to(rightInnerRef.current, { opacity: 0, x: 24, duration: 0.25, ease: "power2.in" }, 0);
-    } else {
-      tl.to(rightPanelRef.current, { width: "100vw", duration: 0.65, ease: "power2.inOut" }, 0);
-      tl.to(
-        leftPanelRef.current,
-        { width: "0vw", paddingLeft: 0, paddingRight: 0, duration: 0.65, ease: "power2.inOut" },
-        0
-      );
-      tl.to(leftInnerRef.current, { opacity: 0, x: -24, duration: 0.25, ease: "power2.in" }, 0);
-    }
+    panels.forEach((panel) => {
+      if (!panel) return;
+      tl.to(panel, { width: panel === selectedPanel ? "100%" : "0%", duration: 0.65, ease: "power2.inOut" }, 0);
+    });
   };
+
+  const activePanelClass = useMemo(() => {
+    if (!selectedRole) return "";
+    return "pointer-events-none";
+  }, [selectedRole]);
 
   return (
     <div ref={containerRef} className="flex-1 min-h-screen flex flex-col relative overflow-hidden">
@@ -92,89 +135,57 @@ export default function RoleSelectionPage() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col md:flex-row relative overflow-hidden">
-        <div
-          ref={leftPanelRef}
-          onClick={() => handleSelectRole("principal")}
-          className={`w-full md:w-1/2 min-h-[45vh] md:min-h-0 bg-[#F5F5F0] flex flex-col justify-center items-center p-8 border-b-2 md:border-b-0 md:border-r-2 border-text-primary relative z-10 cursor-pointer overflow-hidden ${
-            !selectedRole ? "hover:bg-white" : ""
-          }`}
-        >
-          <div
-            ref={leftInnerRef}
-            className="max-w-sm text-center relative z-20 flex flex-col items-center gap-6 min-w-[320px]"
-          >
-            <motion.div
-              whileHover={!selectedRole ? { scale: 1.05, rotate: -2 } : {}}
-              className="h-16 w-16 bg-white border-2 border-text-primary shadow-[4px_4px_0px_rgba(27,23,34,1)] flex items-center justify-center"
-            >
-              <Icon name="key" size={32} />
-            </motion.div>
-            <div>
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-base font-bold mb-2 block">
-                Principal
-              </span>
-              <h2 className="font-mono text-3xl font-bold uppercase tracking-wider">Manage Agents</h2>
-            </div>
-            <p className="text-sm font-mono text-text-secondary leading-relaxed">
-              Register autonomous agents, issue delegation credentials, and configure bounds of mandate.
-            </p>
-            <button
-              className="px-8 py-3 bg-text-primary text-[#F5F5F0] font-mono text-sm uppercase tracking-widest font-bold border-2 border-text-primary"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleSelectRole("principal");
+      <div className="flex-1 flex flex-col lg:flex-row relative overflow-hidden">
+        {roleCards.map((card) => {
+          const isSelected = selectedRole === card.key;
+          return (
+            <div
+              key={card.key}
+              ref={(node) => {
+                panelRefs.current[card.key] = node;
               }}
+              onClick={() => handleSelectRole(card.key)}
+              className={`relative flex-1 min-h-[32vh] lg:min-h-0 p-6 md:p-8 lg:p-10 border-b-2 lg:border-b-0 lg:border-r-2 border-text-primary last:border-r-0 last:border-b-0 overflow-hidden cursor-pointer transition-colors ${card.tint} ${
+                !selectedRole || isSelected ? "" : "opacity-80"
+              } ${activePanelClass}`}
+              style={{ width: !selectedRole ? "100%" : isSelected ? "100%" : "0%" }}
             >
-              Continue as Principal
-            </button>
-          </div>
-        </div>
-
-        <div
-          ref={rightPanelRef}
-          onClick={() => handleSelectRole("lender")}
-          className={`w-full md:w-1/2 min-h-[45vh] md:min-h-0 bg-[#FDF3C8] flex flex-col justify-center items-center p-8 relative z-10 cursor-pointer overflow-hidden ${
-            !selectedRole ? "hover:bg-[#FFF6D4]" : ""
-          }`}
-        >
-          <div
-            ref={rightInnerRef}
-            className="max-w-sm text-center relative z-20 flex flex-col items-center gap-6 min-w-[320px]"
-          >
-            <motion.div
-              whileHover={!selectedRole ? { scale: 1.05, rotate: 2 } : {}}
-              className="h-16 w-16 bg-white border-2 border-text-primary shadow-[4px_4px_0px_rgba(27,23,34,1)] flex items-center justify-center"
-            >
-              <Icon name="policy" size={32} />
-            </motion.div>
-            <div>
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-accent font-bold mb-2 block">
-                Lender
-              </span>
-              <h2 className="font-mono text-3xl font-bold uppercase tracking-wider">Set Policy</h2>
+              <div
+                ref={(node) => {
+                  innerRefs.current[card.key] = node;
+                }}
+                className="relative z-20 flex h-full flex-col items-center justify-center text-center gap-5 max-w-sm mx-auto"
+              >
+                <motion.div
+                  whileHover={!selectedRole ? { scale: 1.05, rotate: card.key === "principal" ? -2 : card.key === "lender" ? 2 : 0 } : {}}
+                  className="h-16 w-16 bg-white border-2 border-text-primary shadow-[4px_4px_0px_rgba(27,23,34,1)] flex items-center justify-center"
+                >
+                  <Icon name={card.icon} size={32} />
+                </motion.div>
+                <div>
+                  <span className={`font-mono text-[10px] uppercase tracking-[0.2em] font-bold mb-2 block ${card.accent}`}>
+                    {card.label}
+                  </span>
+                  <h2 className="font-mono text-2xl md:text-3xl font-bold uppercase tracking-wider text-text-primary">
+                    {card.title}
+                  </h2>
+                </div>
+                <p className="text-sm font-mono text-text-secondary leading-relaxed">
+                  {card.description}
+                </p>
+                <button
+                  className={`px-8 py-3 font-mono text-sm uppercase tracking-widest font-bold border-2 border-text-primary ${card.buttonClass}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelectRole(card.key);
+                  }}
+                >
+                  {card.key === "operator" ? "Open console" : `Continue as ${card.label}`}
+                </button>
+              </div>
             </div>
-            <p className="text-sm font-mono text-text-secondary leading-relaxed">
-              Define risk thresholds, monitor auto-approved loans, and detect anomalies in real time.
-            </p>
-            <button
-              className="px-8 py-3 bg-white text-text-primary font-mono text-sm uppercase tracking-widest font-bold border-2 border-text-primary"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleSelectRole("lender");
-              }}
-            >
-              Continue as Lender
-            </button>
-          </div>
-        </div>
-
-        <div
-          ref={dividerRef}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-30 font-mono text-[12px] font-bold bg-white px-6 py-3 border-2 border-text-primary shadow-[4px_4px_0px_rgba(27,23,34,1)] rotate-2 hidden md:block"
-        >
-          Select Role
-        </div>
+          );
+        })}
       </div>
     </div>
   );

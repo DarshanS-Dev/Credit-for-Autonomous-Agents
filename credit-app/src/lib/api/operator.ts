@@ -142,11 +142,22 @@ async function signMandateWithToken(
     DEFAULT_MANDATE_BOUNDS
   );
 
-  await api.post(
+  const response = await api.post<any>(
     `/agents/${agentId}/mandate`,
-    { agent_id: agentId, bounds: signed.bounds, signature: signed.signatureB64 },
+    {
+      agent_id: agentId,
+      bounds: signed.bounds,
+      signature: signed.signatureB64,
+      issued_at: signed.issuedAtIso,
+    },
     { token: principalToken }
   );
+
+  if (response && response.api_key) {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(`credit-agents:agent-key:${agentId}`, response.api_key);
+    }
+  }
 }
 
 /** Create agent → sign mandate → request loan; misbehaving also triggers spend check. */

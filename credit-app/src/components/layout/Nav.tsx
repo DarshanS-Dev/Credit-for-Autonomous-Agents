@@ -14,9 +14,9 @@ export const Nav: React.FC = () => {
   const router = useRouter();
   const { session, isLoading, logout } = useSession();
 
-  const handleRoleSwitch = () => {
+  const handleLogout = () => {
     logout();
-    router.push("/login/role");
+    router.push("/");
   };
 
   // Pages where the nav should never render at all.
@@ -28,18 +28,6 @@ export const Nav: React.FC = () => {
     pathname !== "/permission-denied";
 
   // ---- Role resolution ----
-  // Bug this fixes: previously `role` came ONLY from session.role, which is
-  // hydrated from localStorage inside a useEffect (see SessionContext).
-  // On first paint (and on any hard refresh) session is briefly null, so
-  // role fell through to the operator nav on EVERY page until the effect
-  // fired — causing the wrong navbar to flash on principal/lender pages.
-  //
-  // Fix: derive role from the URL first (the page you're actually on is
-  // the strongest signal of what nav you should see), and only fall back
-  // to session.role when the path itself doesn't indicate a role (e.g. a
-  // shared/utility route). This also fixes the case where a lender is
-  // logged in but has navigated to a /principal/* URL — the nav now
-  // matches the page, not a stale/mismatched session value.
   const effectiveRole: EffectiveRole = useMemo(() => {
     if (pathname.startsWith("/operator")) return "operator";
     if (pathname.startsWith("/principal")) return "principal";
@@ -48,13 +36,6 @@ export const Nav: React.FC = () => {
   }, [pathname, session?.role]);
 
   // ---- navItems ----
-  // Bug this fixes: navItems was rebuilt as a brand-new array literal on
-  // EVERY render regardless of whether role actually changed. CardNav's
-  // useLayoutEffect depends on [ease, items], so a new array reference on
-  // every render tore down and rebuilt the GSAP timeline constantly,
-  // which is what made the nav feel "stuck" or unresponsive after
-  // navigating. Memoizing on effectiveRole means the timeline is only
-  // rebuilt when the role actually changes.
   const navItems = useMemo(() => {
     if (effectiveRole === "principal") {
       return [
@@ -65,6 +46,7 @@ export const Nav: React.FC = () => {
           links: [
             { label: "Dashboard", href: "/principal/dashboard" },
             { label: "Register Agent", href: "/principal/agents/add" },
+            { label: "Upload History", href: "/principal/upload-cv" },
           ],
         },
         {
@@ -84,6 +66,7 @@ export const Nav: React.FC = () => {
           textColor: "#1B1722",
           links: [
             { label: "Live Activity", href: "/lender/dashboard" },
+            { label: "Marketplace", href: "/lender/marketplace" },
             { label: "Directory", href: "/lender/agents" },
             { label: "Loans", href: "/lender/loans" },
           ],
@@ -111,9 +94,6 @@ export const Nav: React.FC = () => {
       ];
     }
 
-    // effectiveRole === null: no session yet and not on a role-prefixed
-    // route. Render an empty item set rather than guessing "operator" —
-    // this is the other half of fixing the flash-of-wrong-nav bug below.
     return [];
   }, [effectiveRole]);
 
@@ -130,14 +110,6 @@ export const Nav: React.FC = () => {
 
   if (!showNav) return null;
 
-  // Bug this fixes: session hydration (loadSession()) happens inside a
-  // useEffect in SessionContext, so on the very first client render
-  // (and during SSR) `session` is null and `isLoading` is true. Rendering
-  // the nav during that window on a /principal or /lender page is safe
-  // now because effectiveRole is path-derived, but on ambiguous routes
-  // (role coming only from session) we intentionally wait for hydration
-  // to finish before deciding — otherwise we'd render an empty/wrong nav
-  // for a split second even though a valid session exists in storage.
   const roleNeedsSession = effectiveRole === null;
   if (roleNeedsSession && isLoading) {
     return null;
@@ -152,8 +124,8 @@ export const Nav: React.FC = () => {
         menuColor="#1B1722"
         buttonBgColor="#1B1722"
         buttonTextColor="#F5F5F0"
-        ctaText={effectiveRole === "operator" ? "Exit Console" : "Switch Role"}
-        onCtaClick={handleRoleSwitch}
+        ctaText={effectiveRole === "operator" ? "Exit Console" : "Logout"}
+        onCtaClick={handleLogout}
       />
     </div>
   );

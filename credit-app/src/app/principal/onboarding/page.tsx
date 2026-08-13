@@ -23,6 +23,7 @@ export default function PrincipalOnboarding() {
   const [agentName, setAgentName] = useState("");
   const [description, setDescription] = useState("");
   const [createdAgentId, setCreatedAgentId] = useState<number | null>(null);
+  const [apiKey, setApiKey] = useState<string | null>(null);
   const [mandateSigned, setMandateSigned] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,9 +53,11 @@ export default function PrincipalOnboarding() {
       );
       return signAgentMandate(createdAgentId, signed.bounds, signed.signatureB64, signed.issuedAtIso);
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       setMandateSigned(true);
-      setTimeout(() => setStep(3), 1200);
+      if (data && data.api_key) {
+        setApiKey(data.api_key);
+      }
       setError(null);
     },
     onError: (err) => {
@@ -140,6 +143,9 @@ export default function PrincipalOnboarding() {
             {step === 2 && (
               <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="bg-[#F5F5F0] border-2 border-text-primary p-8">
                 <h3 className="font-mono text-sm font-bold uppercase mb-4">Step 2 — Sign the delegation mandate</h3>
+                <div className="bg-text-primary/5 p-4 border font-mono text-xs text-text-secondary mb-4">
+                  <p><strong>Created Agent ID:</strong> {createdAgentId}</p>
+                </div>
                 <div className="bg-text-primary/5 p-4 border font-mono text-xs text-text-secondary mb-6">
                   <p>{DEFAULT_MANDATE_BOUNDS}</p>
                 </div>
@@ -148,9 +154,23 @@ export default function PrincipalOnboarding() {
                     {signMutation.isPending ? "Signing..." : "Sign Mandate"}
                   </Button>
                 ) : (
-                  <div className="flex items-center justify-center gap-3 py-3 border-2 border-text-primary bg-text-primary/5">
-                    <span>✔</span>
-                    <span>Mandate signed. Credential link established.</span>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center gap-3 py-3 border-2 border-text-primary bg-text-primary/5 text-emerald-600">
+                      <span>✔</span>
+                      <span>Mandate signed. Credential link established.</span>
+                    </div>
+                    {apiKey && (
+                      <div className="bg-text-primary/5 p-4 border text-left font-mono text-xs space-y-2">
+                        <p className="break-all"><strong>Agent API Key (X-Agent-Key):</strong> <code>{apiKey}</code></p>
+                        <p className="text-[10px] text-text-secondary">⚠️ Save this key now. It will not be shown again.</p>
+                        <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(apiKey)}>
+                          Copy Key
+                        </Button>
+                      </div>
+                    )}
+                    <Button variant="primary" onClick={() => setStep(3)} className="w-full">
+                      Continue to Step 3
+                    </Button>
                   </div>
                 )}
               </motion.div>

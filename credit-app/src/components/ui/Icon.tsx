@@ -10,15 +10,16 @@ import {
   Link2Off, 
   ShieldX, 
   AlertTriangle,
-  Settings,
-  ChevronRight,
-  TrendingUp,
-  Activity,
-  ArrowLeft,
-  X,
-  Eye,
-  EyeOff,
-  RefreshCw
+  Settings, 
+  ChevronRight, 
+  TrendingUp, 
+  Activity, 
+  ArrowLeft, 
+  X, 
+  Eye, 
+  EyeOff, 
+  RefreshCw, 
+  Terminal
 } from "lucide-react";
 
 export type IconType = 
@@ -40,7 +41,8 @@ export type IconType =
   | "x"
   | "eye"
   | "eye-off"
-  | "refresh-cw";
+  | "refresh-cw"
+  | "terminal";
 
 interface IconProps {
   name: IconType;
@@ -88,6 +90,8 @@ export const Icon: React.FC<IconProps> = ({ name, className = "", size = 24 }) =
       return <EyeOff className={className} size={size} strokeWidth={1} />;
     case "refresh-cw":
       return <RefreshCw className={className} size={size} strokeWidth={1} />;
+    case "terminal":
+      return <Terminal className={className} size={size} strokeWidth={1} />;
     default:
       return null;
   }

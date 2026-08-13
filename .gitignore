@@ -19,3 +19,5 @@ backend/alembic/versions/__pycache__/
 
 # Logs
 *.log
+
+docs

@@ -21,7 +21,7 @@ export default function AgentDirectory() {
   });
 
   const filteredAgents = agents.filter((agent) => {
-    return statusFilter === "ALL" || agent.status === statusFilter.toUpperCase();
+    return statusFilter === "ALL" || agent.status.toLowerCase() === statusFilter.toLowerCase();
   });
 
   return (
@@ -43,7 +43,7 @@ export default function AgentDirectory() {
           {/* Status Filters */}
           <div className="flex items-center gap-2 border-r border-text-secondary/15 pr-4 mr-2">
             <span className="text-text-secondary uppercase">STATUS:</span>
-            {["ALL", "ACTIVE", "STARTER-LIMIT", "DEFAULTED"].map((status) => (
+            {["ALL", "ACTIVE", "REVOKED", "DEFAULTED", "BLACKLISTED"].map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}

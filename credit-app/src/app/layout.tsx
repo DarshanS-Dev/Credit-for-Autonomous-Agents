@@ -5,6 +5,7 @@ import { QueryProvider } from "@/components/providers/QueryProvider";
 import { RouteGuard } from "@/components/auth/RouteGuard";
 import { Nav } from "@/components/layout/Nav";
 import { LenisProvider } from "@/components/layout/LenisProvider";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export const metadata: Metadata = {
   title: "Credit for Autonomous Agents | Ledger Editorial",
@@ -26,7 +27,9 @@ export default function RootLayout({
               <LenisProvider />
               <div className="flex flex-col relative z-0 min-h-screen">
                 <Nav />
-                <main className="flex-1 flex flex-col">{children}</main>
+                <main className="flex-1 flex flex-col">
+                  <PageTransition>{children}</PageTransition>
+                </main>
               </div>
             </RouteGuard>
           </SessionProvider>
@@ -35,3 +38,4 @@ export default function RootLayout({
     </html>
   );
 }
+

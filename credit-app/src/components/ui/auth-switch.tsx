@@ -68,7 +68,7 @@ export function AuthSwitch() {
             gsap.fromTo(
                 cardRef.current,
                 { y: 32, opacity: 0, scale: 0.98 },
-                { y: 0, opacity: 1, scale: 1, duration: 0.7, ease: "power4.out" }
+                { y: 0, opacity: 1, scale: 1, duration: 0.7, ease: "power4.out", delay: 0.3 }
             );
         }, containerRef);
         return () => ctx.revert();

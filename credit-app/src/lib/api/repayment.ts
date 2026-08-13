@@ -16,20 +16,22 @@ export function checkSpend(
 
 export function declareTaskFailure(
   agentId: number,
-  token?: string
+  token?: string,
+  agentKey?: string
 ): Promise<TaskFailureResultOut> {
   return api.post<TaskFailureResultOut>(
     `/repayment/task-failure/${agentId}`,
     {},
-    { token }
+    { token, agentKey }
   );
 }
 
 export function recordInflow(
   agentId: number,
   amount: number,
-  token?: string
+  token?: string,
+  agentKey?: string
 ): Promise<RepaymentLedgerEntry> {
-  return api.post<RepaymentLedgerEntry>(`/repayment/inflow/${agentId}`, { amount }, { token });
+  return api.post<RepaymentLedgerEntry>(`/repayment/inflow/${agentId}`, { amount }, { token, agentKey });
 }
 

@@ -56,7 +56,7 @@ const roleCards: Array<{
     tint: "bg-[#EAF7F8]",
     buttonClass: "bg-[#017587] text-[#F5F5F0]",
     textClass: "text-text-primary",
-    route: "/login?role=operator",
+    route: "/operator",
   },
 ];
 
@@ -93,21 +93,47 @@ export default function RoleSelectionPage() {
     return () => ctx.revert();
   }, []);
 
+  const headerRef = useRef<HTMLDivElement>(null);
+
   const handleSelectRole = (role: RoleOption) => {
     if (selectedRole) return;
     setSelectedRole(role);
 
+    const destination = role === "operator" ? "/operator" : `/login?role=${role}`;
+
     const tl = gsap.timeline({
-      onComplete: () => router.push(`/login?role=${role}`),
+      onComplete: () => router.push(destination),
     });
 
     const panels = [panelRefs.current.principal, panelRefs.current.lender, panelRefs.current.operator];
     const selectedPanel = panelRefs.current[role];
 
+    // Fade and collapse top header so card takes 100% screen
+    if (headerRef.current) {
+      tl.to(headerRef.current, { opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0, duration: 0.4, ease: "power2.inOut" }, 0);
+    }
+
+    // Fade out and fully collapse non-selected panels
     panels.forEach((panel) => {
-      if (!panel) return;
-      tl.to(panel, { width: panel === selectedPanel ? "100%" : "0%", duration: 0.65, ease: "power2.inOut" }, 0);
+      if (!panel || panel === selectedPanel) return;
+      tl.to(panel, { 
+        opacity: 0, 
+        flex: 0,
+        minHeight: 0,
+        padding: 0,
+        borderWidth: 0,
+        duration: 0.4, 
+        ease: "power2.inOut" 
+      }, 0);
     });
+
+    // Progress bar fills (happens in background now since header fades, but good for safety)
+    if (progressRef.current) {
+      tl.to(progressRef.current, { scaleX: 1, duration: 0.4, ease: "power2.inOut" }, 0);
+    }
+
+    // After panels expand, hold for a beat, then fade out the whole page
+    tl.to(containerRef.current, { opacity: 0, duration: 0.3, ease: "power2.in" }, 0.6);
   };
 
   const activePanelClass = useMemo(() => {
@@ -116,8 +142,8 @@ export default function RoleSelectionPage() {
   }, [selectedRole]);
 
   return (
-    <div ref={containerRef} className="flex-1 min-h-screen flex flex-col relative overflow-hidden">
-      <div className="relative z-40 flex items-center justify-between px-6 md:px-12 py-6 bg-[#F5F5F0] border-b-2 border-text-primary/10">
+    <div ref={containerRef} className="flex-1 min-h-screen flex flex-col relative overflow-hidden bg-text-primary">
+      <div ref={headerRef} className="relative z-40 flex items-center justify-between px-6 md:px-12 py-6 bg-[#F5F5F0] border-b-2 border-text-primary/10 overflow-hidden">
         <Link
           href="/"
           className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest font-bold text-text-secondary hover:text-text-primary transition-colors group"
@@ -148,7 +174,6 @@ export default function RoleSelectionPage() {
               className={`relative flex-1 min-h-[32vh] lg:min-h-0 p-6 md:p-8 lg:p-10 border-b-2 lg:border-b-0 lg:border-r-2 border-text-primary last:border-r-0 last:border-b-0 overflow-hidden cursor-pointer transition-colors ${card.tint} ${
                 !selectedRole || isSelected ? "" : "opacity-80"
               } ${activePanelClass}`}
-              style={{ width: !selectedRole ? "100%" : isSelected ? "100%" : "0%" }}
             >
               <div
                 ref={(node) => {

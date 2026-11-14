@@ -9,6 +9,7 @@ import ShapeGrid from "@/components/ui/ShapeGrid";
 import { Icon } from "@/components/ui/Icon";
 import { useSession } from "@/context/SessionContext";
 import { login, signup } from "@/lib/api/auth";
+import { rotatePublicKey } from "@/lib/api/auth";
 import { generatePrincipalKeypair } from "@/lib/crypto/mandate";
 import { savePrincipalKeypair } from "@/lib/session";
 import { ApiError } from "@/lib/api/client";
@@ -100,6 +101,27 @@ export default function AuthScreen() {
           }
         } else {
           tokenResponse = await login({ role, email, password } as any);
+          // After login: if this principal has no keypair in localStorage
+          // (new device, cleared storage) generate a fresh one and register
+          // the new public key with the backend.  Without this, signMandate()
+          // throws before any network request and the UI shows
+          // "Mandate signing failed" with nothing hitting the backend.
+          if (role === "principal") {
+            const { loadPrincipalKeypair } = await import("@/lib/session");
+            const existing = loadPrincipalKeypair(tokenResponse.id);
+            if (!existing) {
+              const freshKeypair = generatePrincipalKeypair();
+              // Temporarily set session token so rotatePublicKey can auth
+              // (setSession hasn't been called yet, so we call directly)
+              const { saveSession } = await import("@/lib/session");
+              saveSession({ token: tokenResponse.access_token, role: tokenResponse.role, id: tokenResponse.id, name, email });
+              await rotatePublicKey(freshKeypair.publicKeyB64);
+              savePrincipalKeypair(tokenResponse.id, {
+                privateKeyHex: freshKeypair.privateKeyHex,
+                publicKeyHex: freshKeypair.publicKeyHex,
+              });
+            }
+          }
         }
       }
 

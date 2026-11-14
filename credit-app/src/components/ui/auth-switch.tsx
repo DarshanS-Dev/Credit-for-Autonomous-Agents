@@ -11,6 +11,7 @@ import { AgentMotionIllustration } from "@/components/ui/AgentMotionIllustration
 import { FeatureCarousel } from "@/components/ui/FeatureCarousel";
 import { useSession } from "@/context/SessionContext";
 import { login, signup } from "@/lib/api/auth";
+import { rotatePublicKey } from "@/lib/api/auth";
 import { generatePrincipalKeypair } from "@/lib/crypto/mandate";
 import { savePrincipalKeypair } from "@/lib/session";
 import { ApiError } from "@/lib/api/client";
@@ -132,6 +133,24 @@ export function AuthSwitch() {
                     }
                 } else {
                     tokenResponse = await login({ role, email, password } as any);
+                    // After login: if this principal has no keypair in localStorage
+                    // (new device / cleared storage), generate a fresh one and push
+                    // the new public key to the backend.  Without this, signMandate()
+                    // throws client-side before any network request is made.
+                    if (role === "principal") {
+                        const { loadPrincipalKeypair } = await import("@/lib/session");
+                        const existing = loadPrincipalKeypair(tokenResponse.id);
+                        if (!existing) {
+                            const freshKeypair = generatePrincipalKeypair();
+                            const { saveSession } = await import("@/lib/session");
+                            saveSession({ token: tokenResponse.access_token, role: tokenResponse.role as SessionRole, id: tokenResponse.id, name, email });
+                            await rotatePublicKey(freshKeypair.publicKeyB64);
+                            savePrincipalKeypair(tokenResponse.id, {
+                                privateKeyHex: freshKeypair.privateKeyHex,
+                                publicKeyHex: freshKeypair.publicKeyHex,
+                            });
+                        }
+                    }
                 }
             }
 

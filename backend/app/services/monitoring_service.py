@@ -39,6 +39,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Agent, EventType, Event, Loan, LoanStatus
 from app.services import ledger_service
+from app.services import memory_service
 from app.dependencies import revoke_agent
 
 
@@ -157,6 +158,18 @@ def _handle_default(db: Session, agent: Agent, loan: Loan, reason: str) -> None:
     """
     ledger_service.declare_default(db, loan_id=loan.id)
     revoke_agent(db, agent_id=agent.id, reason=reason)
+
+    # Memory: retain this rogue agent's behavioral fingerprint so
+    # assess_rogue_similarity() can warn on future applicants that
+    # look like this agent (same principal, similar score, same recipient).
+    memory_service.record_rogue_agent(
+        agent_id=agent.id,
+        principal_id=agent.principal_id,
+        score_at_revocation=float(agent.score.score) if agent.score else 0.0,
+        category=None,  # category not on Agent model yet
+        recipient=loan.approved_recipient,
+        reason="wrong_recipient",
+    )
 
     db.add(Event(
         agent_id=agent.id,

@@ -23,3 +23,7 @@ export function signup(payload: SignupPayload): Promise<TokenResponse> {
 export function login(payload: LoginPayload): Promise<TokenResponse> {
   return api.post<TokenResponse>("/auth/login", payload, { skipAuth: true });
 }
+
+export function rotatePublicKey(publicKeyB64: string): Promise<{ ok: boolean; warning: string }> {
+  return api.patch<{ ok: boolean; warning: string }>("/auth/me/public-key", { public_key: publicKeyB64 });
+}

@@ -42,6 +42,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Lender, Loan, LoanStatus
 from app.services.underwriting_service import UnderwritingDecision
+from app.services import memory_service
 
 
 # ---------- Return type ----------
@@ -106,6 +107,12 @@ def evaluate_loan_request(
     lender: Lender,
     underwriting_decision: UnderwritingDecision,
     requested_category: str | None = None,
+    # Passed through from the router so the memory checks can fingerprint
+    # the applicant.  Optional so existing tests that call without them
+    # continue to work unchanged.
+    agent_id: int = 0,
+    principal_id: int = 0,
+    requested_recipient: str = "",
 ) -> PolicyDecision:
     """
     Combine underwriting_decision with lender-wide policy checks to produce
@@ -166,15 +173,53 @@ def evaluate_loan_request(
             ),
         )
 
+    # ── Check 4: Hindsight memory signals (advisory) ──────────────────────
+    # Both checks are fire-and-forget on failure (memory_service wraps them
+    # in try/except). A Hindsight outage must NEVER block an otherwise valid
+    # loan — worst case is memory notes are absent and limit is unchanged.
+
+    base_explanation = (
+        f"category and platform exposure checks passed "
+        f"({projected_exposure}/{cap}) -> approved at {underwriting_decision.approved_limit}"
+    )
+    memory_notes: list[str] = []
+
+    # 4a — Lender book: does this recipient+category have a poor track record
+    #      across this lender's entire loan portfolio?
+    pattern_summary = memory_service.recall_lender_pattern(
+        lender_id=lender.id,
+        recipient=requested_recipient,
+        category=requested_category,
+    )
+    if pattern_summary:
+        memory_notes.append(f"[Memory — lender book] {pattern_summary}")
+
+    # 4b — Rogue cluster: does this applicant look like known rogue agents?
+    rogue_flag, rogue_explanation = memory_service.assess_rogue_similarity(
+        agent_id=agent_id,
+        principal_id=principal_id,
+        score=float(underwriting_decision.score_at_decision),
+        category=requested_category,
+        requested_recipient=requested_recipient,
+    )
+    if rogue_flag and rogue_explanation:
+        memory_notes.append(f"[Memory — rogue similarity] {rogue_explanation}")
+
+    # If either memory signal fired, halve the approved limit as a soft
+    # precaution (floored at $10 so a marginal applicant is not zeroed out).
+    final_limit = underwriting_decision.approved_limit
+    if memory_notes:
+        MEMORY_REDUCTION_FLOOR = Decimal("10.00")
+        final_limit = max(final_limit / Decimal("2"), MEMORY_REDUCTION_FLOOR)
+
+    full_explanation = "; ".join([base_explanation] + memory_notes)
+
     return PolicyDecision(
         category_allowed=True,
         current_platform_exposure=exposure,
         platform_exposure_cap=cap,
         would_exceed_platform_cap=False,
         final_approved=True,
-        final_limit=underwriting_decision.approved_limit,
-        explanation=(
-            f"category and platform exposure checks passed "
-            f"({projected_exposure}/{cap}) -> approved at {underwriting_decision.approved_limit}"
-        ),
+        final_limit=final_limit,
+        explanation=full_explanation,
     )

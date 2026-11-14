@@ -63,6 +63,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.models import Agent, InsurancePool, Loan, LoanStatus, Transaction, TransactionType, Wallet, Event, EventType
+from app.services import memory_service
 
 
 # ---------- Tunable constants ----------
@@ -276,6 +277,17 @@ def process_inflow(db: Session, agent_id: int, inflow_amount: Decimal) -> Inflow
             event_type=EventType.REPAYMENT_DEDUCTED,
             detail=f"loan fully repaid: final deduction {amount_deducted} clears outstanding balance",
         ))
+        # Memory: record this repayment outcome in the lender's book so
+        # future loan requests against this recipient benefit from the
+        # positive pattern (e.g. "vouched cold-start graduates repay fine").
+        memory_service.record_loan_outcome(
+            lender_id=loan.lender_id,
+            agent_id=loan.agent_id,
+            recipient=loan.approved_recipient,
+            category=None,  # category not on Loan model yet
+            outcome="repaid",
+            amount=float(loan.principal_amount),
+        )
 
     db.add(Transaction(
         agent_id=agent_id,
@@ -387,7 +399,7 @@ def declare_default(db: Session, loan_id: int) -> DefaultResult:
     loan.status = LoanStatus.DEFAULTED
     loan.write_off_amount = final_write_off
 
-    return DefaultResult(
+    result = DefaultResult(
         loan_id=loan.id,
         agent_id=agent.id,
         shortfall_before_clawback=shortfall,
@@ -396,3 +408,17 @@ def declare_default(db: Session, loan_id: int) -> DefaultResult:
         insurance_payout=insurance_draw,
         final_write_off_amount=final_write_off,
     )
+
+    # Memory: record this default in the lender's book so the cross-agent
+    # pattern (e.g. "loans to recipient X defaulted 3 of 4 times") is
+    # available to recall_lender_pattern() at the next loan request.
+    memory_service.record_loan_outcome(
+        lender_id=loan.lender_id,
+        agent_id=loan.agent_id,
+        recipient=loan.approved_recipient,
+        category=None,  # category not on Loan model yet
+        outcome="defaulted",
+        amount=float(loan.principal_amount),
+    )
+
+    return result

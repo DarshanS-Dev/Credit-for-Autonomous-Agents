@@ -125,7 +125,13 @@ def request_loan(
 
     underwriting = underwriting_service.make_underwriting_decision(db, agent, lender)
     policy = policy_engine.evaluate_loan_request(
-        db, lender, underwriting, requested_category=payload.task_category
+        db,
+        lender,
+        underwriting,
+        requested_category=payload.task_category,
+        agent_id=agent.id,
+        principal_id=agent.principal_id,
+        requested_recipient=payload.approved_recipient,
     )
 
     if not policy.final_approved:

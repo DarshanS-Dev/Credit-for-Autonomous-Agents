@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     # credential_service.py about splitting this into its own secret later)
     agent_api_key_pepper: str = ""
 
+    # Hindsight Cloud memory
+    hindsight_base_url: str = "https://api.hindsight.vectorize.io"
+    hindsight_api_key: str = ""
+
     # App
     environment: str = "development"
     debug: bool = True

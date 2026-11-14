@@ -63,3 +63,46 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
     token = create_access_token(subject_id=row.id, role=payload.role.value)
     return TokenResponse(access_token=token, role=payload.role, id=row.id)
+
+
+from app.dependencies import get_current_principal
+from pydantic import BaseModel
+
+
+class PublicKeyUpdate(BaseModel):
+    public_key: str
+
+
+@router.patch("/me/public-key", status_code=status.HTTP_200_OK)
+def rotate_public_key(
+    payload: PublicKeyUpdate,
+    principal=Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
+    """
+    Replace the principal's stored public key.
+
+    Called by the frontend when a principal logs in on a device that no
+    longer has their Ed25519 private key in localStorage (e.g. cleared
+    storage, new browser).  The frontend generates a fresh keypair,
+    persists the private key locally, and calls this endpoint with the
+    new public key so subsequent mandate signatures verify correctly.
+
+    Side-effect: any agent mandates signed with the OLD key are now
+    permanently invalidated — they will fail verify_mandate() until
+    re-signed.  The response includes a warning so the frontend can tell
+    the principal to re-sign mandates for existing agents.
+    """
+    if not payload.public_key:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "public_key must not be empty")
+
+    principal.public_key = payload.public_key
+    db.commit()
+
+    return {
+        "ok": True,
+        "warning": (
+            "Public key updated. Any previously signed agent mandates are "
+            "now invalid — please re-sign mandates for existing agents."
+        ),
+    }

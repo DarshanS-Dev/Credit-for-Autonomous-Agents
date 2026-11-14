@@ -129,6 +129,7 @@ def request_loan(
         lender,
         underwriting,
         requested_category=payload.task_category,
+        requested_amount=payload.principal_amount,
         agent_id=agent.id,
         principal_id=agent.principal_id,
         requested_recipient=payload.approved_recipient,
@@ -172,12 +173,17 @@ def request_loan(
             f"(was {policy.final_limit} from score/policy)"
         )
 
+    requested = Decimal(payload.principal_amount)
+    granted = min(requested, final_limit)
+    if granted < requested:
+        explanation += f"; requested {requested} clamped to limit {granted}"
+
     loan = Loan(
         agent_id=agent.id,
         lender_id=lender.id,
-        principal_amount=payload.principal_amount,
+        principal_amount=granted,
         interest_amount=0,
-        outstanding_balance=payload.principal_amount,
+        outstanding_balance=granted,
         status=LoanStatus.APPROVED,
         credit_limit_at_issuance=final_limit,
         approved_recipient=payload.approved_recipient,

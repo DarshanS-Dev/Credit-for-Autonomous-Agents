@@ -202,7 +202,11 @@ def _request_loan_internal(db: Session, agent: Agent, lender: Lender,
     right now.
     """
     underwriting = underwriting_service.make_underwriting_decision(db, agent, lender)
-    policy = policy_engine.evaluate_loan_request(db, lender, underwriting, requested_category=None)
+    policy = policy_engine.evaluate_loan_request(
+        db, lender, underwriting, requested_category=None,
+        requested_amount=principal_amount, agent_id=agent.id,
+        principal_id=agent.principal_id, requested_recipient=approved_recipient,
+    )
 
     if not policy.final_approved:
         loan = Loan(
@@ -220,9 +224,13 @@ def _request_loan_internal(db: Session, agent: Agent, lender: Lender,
         return loan
 
     final_limit = Decimal(agent.manual_credit_limit_override) if agent.manual_credit_limit_override is not None else policy.final_limit
+    granted = min(principal_amount, final_limit)
+    explanation = policy.explanation
+    if granted < principal_amount:
+        explanation += f"; requested {principal_amount} clamped to limit {granted}"
     loan = Loan(
-        agent_id=agent.id, lender_id=lender.id, principal_amount=principal_amount,
-        interest_amount=0, outstanding_balance=principal_amount, status=LoanStatus.APPROVED,
+        agent_id=agent.id, lender_id=lender.id, principal_amount=granted,
+        interest_amount=0, outstanding_balance=granted, status=LoanStatus.APPROVED,
         credit_limit_at_issuance=final_limit, approved_recipient=approved_recipient,
         score_at_decision=underwriting.score_at_decision,
         policy_min_score_at_decision=underwriting.policy_min_score,
@@ -230,7 +238,7 @@ def _request_loan_internal(db: Session, agent: Agent, lender: Lender,
     db.add(loan)
     db.flush()
     ledger_service.disburse_loan(db, loan)
-    db.add(Event(agent_id=agent.id, loan_id=loan.id, event_type=EventType.LOAN_APPROVED, detail=policy.explanation))
+    db.add(Event(agent_id=agent.id, loan_id=loan.id, event_type=EventType.LOAN_APPROVED, detail=explanation))
     db.commit()
     db.refresh(loan)
     return loan

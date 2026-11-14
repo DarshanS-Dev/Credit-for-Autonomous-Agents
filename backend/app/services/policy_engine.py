@@ -107,6 +107,7 @@ def evaluate_loan_request(
     lender: Lender,
     underwriting_decision: UnderwritingDecision,
     requested_category: str | None = None,
+    requested_amount: Decimal | None = None,
     # Passed through from the router so the memory checks can fingerprint
     # the applicant.  Optional so existing tests that call without them
     # continue to work unchanged.
@@ -155,7 +156,10 @@ def evaluate_loan_request(
             ),
         )
 
-    projected_exposure = exposure + underwriting_decision.approved_limit
+    effective = underwriting_decision.approved_limit
+    if requested_amount is not None:
+        effective = min(effective, requested_amount)
+    projected_exposure = exposure + effective
     would_exceed = projected_exposure > cap
 
     if would_exceed:

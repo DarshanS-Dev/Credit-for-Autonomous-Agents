@@ -209,7 +209,7 @@ class LenderOut(ORMBase):
 class LoanRequest(BaseModel):
     agent_id: int
     lender_id: int
-    principal_amount: Decimal
+    principal_amount: Decimal = Field(gt=0)
     approved_recipient: str
     task_category: Optional[str] = None
 
